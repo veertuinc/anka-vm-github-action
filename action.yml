@@ -1,0 +1,45 @@
+name: 'Anka GitHub Action'
+description: 'Prepare an Anka VM and execute commands inside'
+author: Veertu
+branding:
+  icon: 'cloud'
+  color: 'purple'
+inputs:
+  anka-template:
+    description: 'name or UUID of your Anka Template'
+    required: true
+  anka-tag:
+    description: 'name of Anka Tag (optional; defaults to latest tag)'
+  anka-custom-vm-label:
+    description: 'label for the cloned VM that will execute your code (default: github-actions-${GITHUB_REPOSITORY}-${GITHUB_RUN_NUMBER}-${GITHUB_JOB}-${GITHUB_ACTION})'
+  commands:
+    description: 'commands you wish to run inside of the Anka VM'
+    required: true
+  host-pre-commands:
+    description: 'commands you wish to run outside on the node (host) BEFORE preparation of and execution inside the VM'
+  host-post-commands:
+    description: 'commands you wish to run outside on the node (host) AFTER preparation of and execution inside the VM'
+  anka-start-options:
+    description: 'options set for the anka start execution'
+  anka-run-options:
+    description: 'options set for anka run execution'
+  anka-registry-pull-options:
+    description: 'options set for anka registry pull execution'
+  host-command-options:
+    description: 'options to use for github actions exec command; must be a js object (do not use single quotes to wrap values; { key: "value" }) or JSON ({ "key": "value" }) inside of a string!\nSupported options: https://github.com/actions/toolkit/blob/master/packages/exec/src/interfaces.ts'
+  lock-file-location:
+    description: 'location where the pull/clone lock file exists (defaults to /tmp)'
+  artifact-files:
+    description: 'each file you wish to upload and include in the final artifact, newline separated'
+  artifact-archive-file-name:
+    description: 'name of the artifact (archive) that contains all of the files specified in the artifact-files input (default: "artifact")'
+  artifacts-root-directory:
+    description: 'an absolute or relative file path that denotes the root parent directory of the files being uploaded'
+  skip-registry-pull:
+    description: 'skip the registry pull; useful if you do not have a registry or it is down and the Template + Tag are already on the node'
+outputs:
+  std:
+    description: 'the STDOUT and STDERR from the executed commands'
+runs:
+  using: 'node12'
+  main: 'dist/index.js'

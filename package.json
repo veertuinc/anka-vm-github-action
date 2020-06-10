@@ -1,0 +1,40 @@
+{
+  "name": "anka-github-action",
+  "version": "0.1.0",
+  "description": "JavaScript Action Template",
+  "main": "index.js",
+  "scripts": {
+    "lint": "eslint index.js",
+    "package": "ncc build index.js -o dist",
+    "test": "eslint index.js && jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/actions/javascript-action.git"
+  },
+  "jest": {
+    "verbose": true
+  },
+  "keywords": [
+    "GitHub",
+    "Actions",
+    "JavaScript"
+  ],
+  "author": "GitHub",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/actions/javascript-action/issues"
+  },
+  "homepage": "https://github.com/actions/javascript-action#readme",
+  "dependencies": {
+    "@actions/artifact": "^0.3.2",
+    "@actions/core": "^1.2.4",
+    "@actions/exec": "^1.0.4",
+    "@actions/io": "^1.0.2"
+  },
+  "devDependencies": {
+    "@zeit/ncc": "^0.20.5",
+    "eslint": "^6.3.0",
+    "jest": "^24.9.0"
+  }
+}
