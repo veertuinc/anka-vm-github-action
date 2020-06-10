@@ -39,11 +39,7 @@ describe('execute functions', () => {
       await expect(`${execute.STD}`).toMatch(`\ntest1\nTest2`);
     });
     test('script execution with args', async() => {
-      await execute.nodeCommands("hostname && ./.github/workflows/test.bash 1 2 3 4",options)
-      await expect(`${execute.STD}`).toMatch(`\n1\n2\n3 4`);
-    });
-    test('script execution with args', async() => {
-      await execute.nodeCommands("hostname && ./.github/workflows/test.bash 1 2 3 4",options)
+      await execute.nodeCommands("hostname && ./test.bash 1 2 3 4",options)
       await expect(`${execute.STD}`).toMatch(`\n1\n2\n3 4`);
     });
     describe('options', () => {
