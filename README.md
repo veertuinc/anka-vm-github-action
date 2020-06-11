@@ -146,6 +146,9 @@ There are two types of tests we perform:
 2. Functional testing using a workflow yaml (not in this repo)
 
 ### TO-DO
-- Support cleanup on cancellation (are hooks even possible with actions?)
+- Support cleanup on cancellation (are hooks even possible with actions?) (javascript to catch signals)
 - Support multiple artifacts and files for those artifacts
 - Better tests with mocks so we can avoid so much functional testing
+- Execution of anka run should happen with `anka run template sh` and then passing into STDIN
+- Passing host ENV into VM
+  - Clone within VM (with skip-clone inputs)

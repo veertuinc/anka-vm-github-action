@@ -1,11 +1,11 @@
 {
-  "name": "anka-github-action",
-  "version": "0.1.0",
+  "name": "anka-vm-github-action",
+  "version": "1.0.0",
   "description": "A GitHub Action for running commands within Anka VMs",
   "main": "index.js",
   "scripts": {
     "lint": "eslint index.js",
-    "package": "ncc build index.js -o dist",
+    "package": "ncc build index.js -o dist -m",
     "test": "eslint index.js && jest"
   },
   "repository": {
