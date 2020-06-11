@@ -11,7 +11,7 @@ jobs:
           submodules: true
       - name: pull test prep 1
         id: pull-test-prep-1
-        uses: ./anka-vm-github-action
+        uses: ./
         with:
           anka-registry-pull-options: "-s" # Needed to remove other cached tags and cause openjdk pull to take a while so we can test the Lock file
           anka-template: "10.15.4"
@@ -29,7 +29,7 @@ jobs:
       
       - name: pull test prep 2
         id: pull-test-prep-2
-        uses: ./anka-vm-github-action
+        uses: ./
         with:
           anka-template: "10.15.4"
           anka-tag: "base:port-forward-22:brew-git:openjdk-1.8.0_242:jenkins"
@@ -37,7 +37,7 @@ jobs:
 
       - name: basic commands
         id: basic
-        uses: ./anka-vm-github-action
+        uses: ./
         with:
           anka-template: "10.15.4"
           anka-tag: "base:port-forward-22:brew-git"
@@ -51,14 +51,14 @@ jobs:
 
       - name: chained commands and redirection into file
         id: chained-redirect
-        uses: ./anka-vm-github-action
+        uses: ./
         with:
           anka-template: "10.15.4"
           commands: "hostname && echo \"test1\" && echo \"Test2\" > /tmp/test && cat /tmp/test"
 
       - name: script execution with args
         id: script-and-args
-        uses: ./anka-vm-github-action
+        uses: ./
         with:
           anka-run-options: "--wait-network --wait-time"
           anka-template: "10.15.4"
@@ -67,7 +67,7 @@ jobs:
 
       - name: inputs are accepted and working
         id: inputs-testing
-        uses: ./anka-vm-github-action
+        uses: ./
         with:
           anka-template: "10.15.4"
           anka-tag: "DOESNOTEXIST"
@@ -92,7 +92,7 @@ jobs:
 
       - name: artifacts
         id: artifacts-1
-        uses: ./anka-vm-github-action
+        uses: ./
         with:
           anka-template: "10.15.4"
           anka-tag: base
@@ -160,7 +160,7 @@ jobs:
         run: "sleep 20"
       - name: pull test 2
         id: pull-test-2
-        uses: ./anka-vm-github-action
+        uses: ./
         with:
           anka-template: "10.15.4"
           anka-tag: "base:port-forward-22"
