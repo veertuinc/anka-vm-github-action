@@ -53,12 +53,12 @@ describe('execute functions', () => {
         ).rejects.toEqual(new Error('cannot find ./doesnotexist'))
       });
       test('cwd (js object)', async() => {
-        await execute.nodeCommands("ls .test","{cwd: \"./dist\"}")
-        await expect(`${execute.STD.trim()}`).toBe(".test");
+        await execute.nodeCommands("ls","{cwd: \"./dist\"}")
+        await expect(`${execute.STD.trim()}`).toBe("index.js");
       });
       test('json (json)', async() => {
-        await execute.nodeCommands("ls .test","{\"cwd\": \"./dist\"}")
-        await expect(`${execute.STD.trim()}`).toBe(".test");
+        await execute.nodeCommands("ls","{\"cwd\": \"./dist\"}")
+        await expect(`${execute.STD.trim()}`).toBe("index.js");
       });
     });
   });

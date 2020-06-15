@@ -172,7 +172,7 @@ jobs:
         run: |
           PULL_TEST_STD="${{ steps.pull-test-2.outputs.std }}"
           printf "pull test std ========================\n${{ steps.pull-test-2.outputs.std }}"
-          [[ ! -z "$(echo $PULL_TEST_STD | head -n 1)" ]] || exit 50
-          [[ ! -z "$(echo $PULL_TEST_STD | grep 'Lock file /tmp/registry-pull-lock-10.15.4 found')" ]] || exit 51
+          [[ ! -z "$(echo $PULL_TEST_STD | head -n 1)" ]] || exit 100
+          [[ ! -z "$(echo $PULL_TEST_STD | grep 'Lock file /tmp/registry-pull-lock-10.15.4 found')" ]] || exit 101
           
           true
