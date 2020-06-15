@@ -1,7 +1,7 @@
 ## Using the (BETA) Anka GitHub Action
 
 1. Include a `.github/workflows/{whatever}.yml` in your repo
-2. Make sure to set your mapping key `uses:` to `veertuinc/anka-github-action@vX.X.X`
+2. Make sure to set your mapping key `uses:` to `veertuinc/anka-vm-github-action@vX.X.X`
 3. There are a few required key/values you need to include under `with:`: `anka-template` and `commands` (see the Inputs section for more information)
 
 ```yaml
@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: build
         id: build
-        uses: veertuinc/anka-github-action@v1.0.0-beta
+        uses: veertuinc/anka-vm-github-action@v1.0.0-beta
         with:
           anka-template: "10.15.4"
           anka-tag: "base:port-forward-22:xcode11-v1"
