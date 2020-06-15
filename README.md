@@ -1,5 +1,7 @@
 ## Using the (BETA) Anka GitHub Action
 
+1. Install the [Anka Virtualization CLI](https://github.com/veertuinc/getting-started#initial-setup) onto a macOS host machine. You'll need a [Template and Tag](https://github.com/veertuinc/getting-started#create-templatebash) generated.
+1. Install and ensure you have registered a shared (org level; found under org settings/actions) _or_ project specific runner (found under repo settings/actions) with GitHub. These runners need to be running on the host machines you run your Anka Virtualization CLI.
 1. Include a `.github/workflows/{whatever}.yml` in your repo
 2. Make sure to set your mapping key `uses:` to `veertuinc/anka-vm-github-action@vX.X.X`
 3. There are a few required key/values you need to include under `with:`: `anka-template` and `commands` (see the Inputs section for more information)
