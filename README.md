@@ -23,9 +23,9 @@ jobs:
           anka-template: "10.15.4"
           anka-tag: "base:port-forward-22:xcode11-v1"
           commands: |
-            git clone https://github.com/aws0m0rg/my-awesome-ios-project.git && \
-            cd my-awesome-ios-project
-            ./build.sh
+            echo "Starting build process"
+            ./build.sh && \
+            ./cleanup.sh
           artifacts: |
             log.txt
             build/binaryfile-v1
@@ -33,11 +33,13 @@ jobs:
 
 The above example will clone your project repo to the github action runner's working directory, pull the Template `10.15.4` and Tag `base:port-forward-22:xcode11-v1` from the Registry, prepare an Anka VM using that Template and Tag, execute the commands inside of the VM, and then upload artifacts `./log.txt` and `./build/binaryfile-v1` from the current directory (which is mounted by default into the VM).
 
+> **Build and Test time can be significantly impacted by the default host -> guest mount. It's suggested that you use `anka-run-options: "--wait-network --wait-time --no-volume"` and then git clone your repo inside of `commands:`.**
+
 ### Inputs
 
 These are defined under the `with:` mapping key inside of your workflow yaml.
 
-#### `anka-template`: 
+#### `anka-template`
 
 - **Name or UUID of your Anka Template**
 - **[Required]**
@@ -48,13 +50,13 @@ These are defined under the `with:` mapping key inside of your workflow yaml.
 - **[Required]**
 - You can use `commands: |` for multi-line input or a simple string
 
-#### `anka-tag`: 
+#### `anka-tag`
 
 - **Name of Anka Tag (optional)**
 - defaults to latest tag
 
-#### `anka-custom-vm-label`: label for the cloned VM that will execute your code
-
+#### `anka-custom-vm-label`
+- **Label for the cloned VM that will execute your code**
 - Defaults to `github-actions-${GITHUB_REPOSITORY}-${GITHUB_RUN_NUMBER}-${GITHUB_JOB}-${GITHUB_ACTION}`
 - Your custom label will have a random number added to the end of it to prevent collisions when two VMs are running on the same node with the same label
 
@@ -90,8 +92,8 @@ These are defined under the `with:` mapping key inside of your workflow yaml.
 
 These are returned to your workflow.yaml so that subsequent steps can use them.
 
-#### `std`: the STDOUT and STDERR from the executed commands
-
+#### `std`
+- The STDOUT and STDERR from the executed commands
 - Includes artifact upload output
 
 Usage:
@@ -148,13 +150,8 @@ There are two types of tests we perform:
 2. Functional testing using a workflow yaml (not in this repo)
 
 ### TO-DO
-- Support cleanup on cancellation (are hooks even possible with actions?) (javascript to catch signals)
 - Support multiple artifacts and files for those artifacts
 - Better tests with mocks so we can avoid so much functional testing
 - Execution of anka run should happen with `anka run template sh` and then passing into STDIN
 - Passing host ENV into VM
-<<<<<<< HEAD
   - Clone within VM (with skip-clone inputs)
-=======
-  - Clone within VM (with skip-clone inputs)
->>>>>>> e964396... readme fixes

@@ -1,3 +1,4 @@
+const core = require('@actions/core');
 const artifact = require('@actions/artifact');
 const helpers = require('./helpers')
 const artifactClient = artifact.create();
@@ -20,6 +21,7 @@ async function createLockFile(ankaTemplate,lockFileLocation,hostCommandOptions) 
   }
   try {
     fs.closeSync(fs.openSync(`${lockFileFull}`, 'w'));
+    core.exportVariable(`${process.env['GITHUB_ACTION']}_isLocked`, true); // Prevent failures from cleaning up the lock file when it was never created by this run
   } catch (error) {
     throw new Error(`Unable to create ${lockFileFull}\n${error.stack}`)
   }
@@ -31,11 +33,15 @@ async function deleteLockFile(ankaTemplate,lockFileLocation) {
     lockFileLocation = lockFileDefault
   }
   var lockFileFull = `${lockFileLocation}/registry-pull-lock-${ankaTemplate}`
-  if (fs.existsSync(lockFileFull)) {
-    try {
-      fs.unlinkSync(`${lockFileFull}`)
-    } catch (error) {
-      throw new Error(`Unable to delete ${lockFileFull}\n${error.stack}`)
+  if (process.env[`${process.env['GITHUB_ACTION']}_isLocked`] === 'true') { // Prevent failures from cleaning up the lock file when it was never created by this run
+    if (fs.existsSync(lockFileFull)) {
+      try {
+        fs.unlinkSync(`${lockFileFull}`)
+        console.log(`Deleted ${lockFileFull}!`)
+        core.exportVariable(`${process.env['GITHUB_ACTION']}_isLocked`, false);
+      } catch (error) {
+        throw new Error(`Unable to delete ${lockFileFull}\n${error.stack}`)
+      }
     }
   }
 }
@@ -67,6 +73,7 @@ module.exports.ankaRegistryPull = ankaRegistryPull;
 async function ankaClone(ankaTemplate,ankaVMLabel,hostCommandOptions,lockFileLocation) {
   try {
     await execute.nodeCommands(`anka clone ${ankaTemplate} ${ankaVMLabel}`,hostCommandOptions,execute.STD)
+    core.exportVariable(`${process.env['GITHUB_ACTION']}_isCreated`, true);
     await deleteLockFile(ankaTemplate,lockFileLocation) // make sure to clean up the lock
     await execute.nodeCommands(`anka list`,hostCommandOptions,execute.STD)
   } catch(error) {

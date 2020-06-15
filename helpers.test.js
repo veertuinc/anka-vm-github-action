@@ -1,12 +1,29 @@
 let helpers = require('./helpers');
+const core = require('@actions/core');
 
 describe('helper functions', () => {
   describe('getVMLabel', () => {
+    afterEach(() => {
+      core.exportVariable('GITHUB_REPOSITORY', undefined)
+      core.exportVariable('GITHUB_RUN_NUMBER', undefined);
+      core.exportVariable('GITHUB_JOB', undefined);
+      core.exportVariable('GITHUB_ACTION', undefined);
+    });
     test('default (no argument)', async() => {
-      expect(await helpers.getVMLabel()).toBe('github-actions-\${GITHUB_REPOSITORY}-\${GITHUB_RUN_NUMBER}-\${GITHUB_JOB}-\${GITHUB_ACTION}')
+      core.exportVariable('GITHUB_REPOSITORY', 'veertuinc/anka-vm-github-action');
+      core.exportVariable('GITHUB_RUN_NUMBER', '102');
+      core.exportVariable('GITHUB_JOB', 'functional-tests');
+      core.exportVariable('GITHUB_ACTION', 'self2');
+      expect(await helpers.getVMLabel()).toBe('github-actions-veertuinc/anka-vm-github-action-102-functional-tests-self2')
+      expect(process.env["self2_vmLabel"]).toBe('github-actions-veertuinc/anka-vm-github-action-102-functional-tests-self2')
     }); // TEST
     test('custom', async() => {
+      core.exportVariable('GITHUB_REPOSITORY', 'veertuinc/anka-vm-github-action');
+      core.exportVariable('GITHUB_RUN_NUMBER', '102');
+      core.exportVariable('GITHUB_JOB', 'functional-tests');
+      core.exportVariable('GITHUB_ACTION', 'self3');
       expect(await helpers.getVMLabel("build-vms")).toMatch(/build-vms-\d+/)
+      expect(process.env["self3_vmLabel"]).toMatch(/build-vms-\d+/)
     }); // TEST
   }); // DESCRIBE
   describe('turnStringIntoObject', () => {
