@@ -151,4 +151,8 @@ There are two types of tests we perform:
 - Better tests with mocks so we can avoid so much functional testing
 - Execution of anka run should happen with `anka run template sh` and then passing into STDIN
 - Passing host ENV into VM
+<<<<<<< HEAD
   - Clone within VM (with skip-clone inputs)
+=======
+  - Clone within VM (with skip-clone inputs)
+>>>>>>> e964396... readme fixes
