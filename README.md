@@ -104,7 +104,7 @@ Usage:
         run: "sleep 20"
       - name: pull test 2
         id: pull-test-2
-        uses: veertuinc/anka-github-action@v1.0.0-beta
+        uses: veertuinc/anka-vm-github-action@v1.0.0-beta
         with:
           anka-template: "10.15.4"
           anka-tag: "base:port-forward-22"
@@ -146,6 +146,14 @@ There are two types of tests we perform:
 2. Functional testing using a workflow yaml (not in this repo)
 
 ### TO-DO
+<<<<<<< HEAD
 - Support cleanup on cancellation (are hooks even possible with actions?)
 - Support multiple artifacts and files for those artifacts
 - Better tests with mocks so we can avoid so much functional testing
+=======
+- Support cleanup on cancellation (are hooks even possible with actions?) (javascript to catch signals)
+- Support multiple artifacts and files for those artifacts
+- Better tests with mocks so we can avoid so much functional testing
+- Execution of anka run should happen with `anka run template sh` and then passing into STDIN
+- Passing host ENV into VM
+  - Clone within VM (with skip-clone inputs)

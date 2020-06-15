@@ -2,13 +2,13 @@ name: Functional Tests
 on:
   push:
     branches: [ master, release/* ]
+
 jobs:
+  
   prep:
     runs-on: [self-hosted, macOS]
     steps:
       - uses: actions/checkout@v2
-        with:
-          submodules: true
       - name: pull test prep 1
         id: pull-test-prep-1
         uses: ./
@@ -24,13 +24,11 @@ jobs:
     needs: prep
     steps:
       - uses: actions/checkout@v2
-        with:
-          submodules: true
-      
       - name: pull test prep 2
         id: pull-test-prep-2
         uses: ./
         with:
+          host-pre-commands: "env"
           anka-template: "10.15.4"
           anka-tag: "base:port-forward-22:brew-git:openjdk-1.8.0_242:jenkins"
           commands: "echo 123"
@@ -63,7 +61,7 @@ jobs:
           anka-run-options: "--wait-network --wait-time"
           anka-template: "10.15.4"
           anka-tag: "base"
-          commands: "hostname && ./anka-vm-github-action/test.bash 1 2 3 4"
+          commands: "hostname && ./test.bash 1 2 3 4"
 
       - name: inputs are accepted and working
         id: inputs-testing
@@ -154,8 +152,6 @@ jobs:
     needs: prep
     steps:
       - uses: actions/checkout@v2
-        with:
-          submodules: true
       - name: sleep
         run: "sleep 20"
       - name: pull test 2
@@ -176,7 +172,7 @@ jobs:
         run: |
           PULL_TEST_STD="${{ steps.pull-test-2.outputs.std }}"
           printf "pull test std ========================\n${{ steps.pull-test-2.outputs.std }}"
-          [[ ! -z "$(echo $PULL_TEST_STD | head -n 1)" ]] || exit 50
-          [[ ! -z "$(echo $PULL_TEST_STD | grep 'Lock file /tmp/registry-pull-lock-10.15.4 found')" ]] || exit 51
+          [[ ! -z "$(echo $PULL_TEST_STD | head -n 1)" ]] || exit 100
+          [[ ! -z "$(echo $PULL_TEST_STD | grep 'Lock file /tmp/registry-pull-lock-10.15.4 found')" ]] || exit 101
           
           true
