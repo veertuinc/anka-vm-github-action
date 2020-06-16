@@ -22,6 +22,7 @@ jobs:
         with:
           anka-template: "10.15.4"
           anka-tag: "base:port-forward-22:xcode11-v1"
+          anka-run-options: "--env"
           commands: |
             echo "Starting build process"
             ./build.sh && \
@@ -31,7 +32,7 @@ jobs:
             build/binaryfile-v1
 ```
 
-The above example will clone your project repo to the github action runner's working directory, pull the Template `10.15.4` and Tag `base:port-forward-22:xcode11-v1` from the Registry, prepare an Anka VM using that Template and Tag, execute the commands inside of the VM, and then upload artifacts `./log.txt` and `./build/binaryfile-v1` from the current directory (which is mounted by default into the VM).
+The above example will clone your project repo to the github action runner's working directory, pull the Template `10.15.4` and Tag `base:port-forward-22:xcode11-v1` from the Registry, prepare an Anka VM using that Template and Tag, execute the commands inside of the VM ensuring Environment Variables are passed in with `anka-run-options: "--env"`, and then upload artifacts `./log.txt` and `./build/binaryfile-v1` from the current directory (which is mounted by default into the VM).
 
 > **Build and Test time can be significantly impacted by the default host -> guest mount. It's suggested that you use `anka-run-options: "--wait-network --wait-time --no-volume"` and then git clone your repo inside of `commands:`.**
 
@@ -153,5 +154,4 @@ There are two types of tests we perform:
 - Support multiple artifacts and files for those artifacts
 - Better tests with mocks so we can avoid so much functional testing
 - Execution of anka run should happen with `anka run template sh` and then passing into STDIN
-- Passing host ENV into VM
-  - Clone within VM (with skip-clone inputs)
+- Clone within VM (with skip-clone inputs)
