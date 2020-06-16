@@ -123,9 +123,9 @@ Usage:
       - name: Check for output
         run: |
           PULL_TEST_STD="${{ steps.pull-test-2.outputs.std }}"
-          printf "pull test std ========================\n${{ steps.pull-test-2.outputs.std }}"
-          [[ ! -z "$(echo $PULL_TEST_STD | head -n 1)" ]] || exit 50
-          [[ ! -z "$(echo $PULL_TEST_STD | grep 'Lock file /tmp/registry-pull-lock-10.15.4 found')" ]] || exit 51
+          printf "pull test std ========================\n$PULL_TEST_STD"
+          [[ ! -z "$(echo \"$PULL_TEST_STD\" | head -n 1)" ]] || exit 50
+          [[ ! -z "$(echo \"$PULL_TEST_STD\" | grep 'Lock file /tmp/registry-pull-lock-10.15.4 found')" ]] || exit 51
           true
 ```
 
