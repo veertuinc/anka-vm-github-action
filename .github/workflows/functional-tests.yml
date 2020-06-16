@@ -80,7 +80,9 @@ jobs:
             echo "HERE" && \
             echo "THERE HERE WHERE"
           host-pre-commands: "env && echo PRE COMMANDS"
-          host-post-commands: "echo POST COMMANDS && echo \"CWD: $(pwd)\""
+          host-post-commands: |
+            echo POST COMMANDS
+            echo \"CWD: $(pwd)\"
           anka-start-options: "-f"
           anka-run-options: "--workdir /tmp"
           host-command-options: |
