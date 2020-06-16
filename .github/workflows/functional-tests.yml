@@ -30,7 +30,7 @@ jobs:
         with:
           host-pre-commands: "env"
           anka-template: "10.15.4"
-          anka-tag: "base:port-forward-22:brew-git:openjdk-1.8.0_242:jenkins"
+          anka-tag: "base:port-forward-22:brew-git:openjdk-1.8.0_242"
           commands: "echo 123"
 
       - name: basic commands
@@ -39,6 +39,7 @@ jobs:
         with:
           anka-template: "10.15.4"
           anka-tag: "base:port-forward-22:brew-git"
+          host-post-commands: "env"
           commands: |
             env
             ls -laht ./
@@ -78,7 +79,7 @@ jobs:
             pwd
             echo "HERE" && \
             echo "THERE HERE WHERE"
-          host-pre-commands: "echo PRE COMMANDS"
+          host-pre-commands: "env && echo PRE COMMANDS"
           host-post-commands: "echo POST COMMANDS && echo \"CWD: $(pwd)\""
           anka-start-options: "-f"
           anka-run-options: "--workdir /tmp"
@@ -102,8 +103,7 @@ jobs:
             pwd > test1
             echo "HERE" && \
             echo "THERE HERE WHERE"
-          host-pre-commands: "echo PRE COMMANDS"
-          host-post-commands: "echo POST COMMANDS && echo \"CWD: $(pwd)\""
+          host-post-commands: "env && echo POST COMMANDS && echo \"CWD: $(pwd)\""
           anka-start-options: "-f"
           artifact-archive-file-name: "test-artifact"
           artifact-files: |
@@ -113,40 +113,58 @@ jobs:
             test3
 
       # [[ ]] testing doesn't like when you interpolate a multi-line ${{ steps. . . }} right in the -z ""; set it to a variable first, then test a single line
+      # Must single quote output in run: due to quotes in commands: (basic)
       - name: Check for output (testing anything execute.test.js doesn't)
         run: |
-          BASIC_STD="${{ steps.basic.outputs.std }}"
-          printf "basic std ========================\n${{ steps.basic.outputs.std }}"
-          [[ ! -z "$(echo $BASIC_STD | head -n 1)" ]] || exit 10
-          [[ -z "$(echo $BASIC_STD | grep 'jenkins')" ]] || exit 11
-          [[ ! -z "$(echo $BASIC_STD | grep '(base:port-forward-22:brew-git)')" ]] || exit 12
-          
-          CHAINED_REDIRECT_STD="${{ steps.chained-redirect.outputs.std }}"
-          printf "\nchained-redirect stdout ========================\n${{ steps.chained-redirect.outputs.std }}"
-          [[ ! -z "$(echo $CHAINED_REDIRECT_STD | head -n 1)" ]] || exit 20
-          
-          SCRIPT_AND_ARGS_STD="${{ steps.script-and-args.outputs.std }}"
-          printf "\nscript-and-args stdout ========================\n${{ steps.script-and-args.outputs.std }}"
-          [[ ! -z "$(echo $SCRIPT_AND_ARGS_STD | head -n 1)" ]] || exit 30
-          [[ ! -z "$(echo $SCRIPT_AND_ARGS_STD | grep '| 10.15.4 (base)')" ]] || exit 31
-          
-          INPUTS_TESTING_STD="${{ steps.inputs-testing.outputs.std }}"
-          printf "\ninputs-testing stdout ========================\n${{ steps.inputs-testing.outputs.std }}"
-          [[ ! -z "$(echo $INPUTS_TESTING_STD | head -n 1)" ]] || exit 40
-          [[ ! -z "$(echo $INPUTS_TESTING_STD | grep 'PRE COMMANDS')" ]] || exit 41
-          [[ ! -z "$(echo $INPUTS_TESTING_STD | grep 'POST COMMANDS')" ]] || exit 42
-          [[ ! -z "$(echo $INPUTS_TESTING_STD | grep '| custom-label-')" ]] || exit 43
-          [[ ! -z "$(echo $INPUTS_TESTING_STD | grep 'CWD: /private/tmp')" ]] || exit 44
-          [[ ! -z "$(echo $INPUTS_TESTING_STD | grep 'PWD=/private/tmp')" ]] || exit 45
+          PULL_TEST_PREP_TWO_STD='${{ steps.pull-test-prep-2.outputs.std }}'
+          printf "\n=======================\npull-test-prep-2 std\n========================\n$PULL_TEST_PREP_TWO_STD"
+          [[ ! -z "$(echo \"$PULL_TEST_PREP_TWO_STD\" | head -n 1)" ]] || exit 1
+          [[ ! -z "$(echo \"$PULL_TEST_PREP_TWO_STD\"  | grep '(base:port-forward-22:brew-git:openjdk-1.8.0_242)')" ]] || exit 3
+          [[ ! -z "$(echo \"$PULL_TEST_PREP_TWO_STD\"  | grep 'self1_isPost=true')" ]] || exit 4
+          [[ -z "$(echo \"$PULL_TEST_PREP_TWO_STD\"  | grep 'self1_isCreated')" ]] || exit 5
+          [[ -z "$(echo \"$PULL_TEST_PREP_TWO_STD\"  | grep 'self1_isLocked')" ]] || exit 6
 
-          ARTIFACTS_ONE_STD="${{ steps.artifacts-1.outputs.std }}"
-          printf "\nartifacts-1 stdout ========================\n${{ steps.artifacts-1.outputs.std }}"
-          [[ ! -z "$(echo $ARTIFACTS_ONE_STD | head -n 1)" ]] || exit 50
-          [[ ! -z "$(echo $ARTIFACTS_ONE_STD | grep 'Created and uploaded artifact test-artifact')" ]] || exit 51
-          [[ ! -z "$(echo $ARTIFACTS_ONE_STD | grep 'Archive contents:.*/test1.*/test2.*/test3')" ]] || exit 52
-          
+          BASIC_STD='${{ steps.basic.outputs.std }}'
+          printf "\n=======================\nbasic std\n========================\n$BASIC_STD"
+          [[ ! -z "$(echo \"$BASIC_STD\" | head -n 1)" ]] || exit 10
+          [[ -z "$(echo \"$BASIC_STD\" | grep 'base:port-forward-22:brew-git:openjdk-')" ]] || exit 11
+          [[ ! -z "$(echo \"$BASIC_STD\" | grep '(base:port-forward-22:brew-git)')" ]] || exit 12
+          [[ ! -z "$(echo \"$BASIC_STD\" | grep 'self2_isPost=true')" ]] || exit 13
+          [[ ! -z "$(echo \"$BASIC_STD\"| grep 'self2_isCreated=true')" ]] || exit 14
+          [[ ! -z "$(echo \"$BASIC_STD\" | grep 'self2_isLocked=false')" ]] || exit 15
+      
+          CHAINED_REDIRECT_STD='${{ steps.chained-redirect.outputs.std }}'
+          printf "\n=======================\nchained-redirect stdout\n========================\n$CHAINED_REDIRECT_STD"
+          [[ ! -z "$(echo \"$CHAINED_REDIRECT_STD\" | head -n 1)" ]] || exit 20
+
+          SCRIPT_AND_ARGS_STD='${{ steps.script-and-args.outputs.std }}'
+          printf "\n=======================\nscript-and-args stdout\n========================\n$SCRIPT_AND_ARGS_STD"
+          [[ ! -z "$(echo \"$SCRIPT_AND_ARGS_STD\" | head -n 1)" ]] || exit 30
+          [[ ! -z "$(echo \"$SCRIPT_AND_ARGS_STD\" | grep '| 10.15.4 (base)')" ]] || exit 31
+
+          INPUTS_TESTING_STD='${{ steps.inputs-testing.outputs.std }}'
+          printf "\n=======================\ninputs-testing stdout\n========================\n$INPUTS_TESTING_STD"
+          [[ ! -z "$(echo \"$INPUTS_TESTING_STD\" | head -n 1)" ]] || exit 40
+          [[ ! -z "$(echo \"$INPUTS_TESTING_STD\" | grep 'PRE COMMANDS')" ]] || exit 41
+          [[ ! -z "$(echo \"$INPUTS_TESTING_STD\" | grep 'POST COMMANDS')" ]] || exit 42
+          [[ ! -z "$(echo \"$INPUTS_TESTING_STD\" | grep '| custom-label-')" ]] || exit 43
+          [[ ! -z "$(echo \"$INPUTS_TESTING_STD\" | grep 'CWD: /private/tmp')" ]] || exit 44
+          [[ ! -z "$(echo \"$INPUTS_TESTING_STD\" | grep 'PWD=/private/tmp')" ]] || exit 45
+          [[ ! -z "$(echo \"$INPUTS_TESTING_STD\"  | grep 'self5_isPost=true')" ]] || exit 46
+          [[ -z "$(echo \"$INPUTS_TESTING_STD\"  | grep 'self5_isCreated')" ]] || exit 47
+          [[ -z "$(echo \"$INPUTS_TESTING_STD\"  | grep 'self5_isLocked')" ]] || exit 48
+
+          ARTIFACTS_ONE_STD='${{ steps.artifacts-1.outputs.std }}'
+          printf "\n=======================\nartifacts-1 stdout\n========================\n$ARTIFACTS_ONE_STD"
+          [[ ! -z "$(echo \"$ARTIFACTS_ONE_STD\" | head -n 1)" ]] || exit 50
+          [[ ! -z "$(echo \"$ARTIFACTS_ONE_STD\"  | grep 'Created and uploaded artifact test-artifact')" ]] || exit 51
+          [[ ! -z "$(echo \"$ARTIFACTS_ONE_STD\"  | grep 'Archive contents:.*/test1.*/test2.*/test3')" ]] || exit 52
+          [[ ! -z "$(echo \"$ARTIFACTS_ONE_STD\"   | grep 'self6_isPost=true')" ]] || exit 53
+          [[ ! -z "$(echo \"$ARTIFACTS_ONE_STD\"   | grep 'self6_isCreated=true')" ]] || exit 54
+          [[ ! -z "$(echo \"$ARTIFACTS_ONE_STD\"   | grep 'self6_isLocked=false')" ]] || exit 55
+
           true
-          
+              
 
   functional-tests-second-agent:
     runs-on: [self-hosted, macOS]
@@ -154,7 +172,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: sleep
-        run: "sleep 20"
+        run: "sleep 30"
       - name: pull test 2
         id: pull-test-2
         uses: ./
@@ -171,8 +189,8 @@ jobs:
 
       - name: Check for output (testing anything execute.test.js doesn't)
         run: |
-          PULL_TEST_STD="${{ steps.pull-test-2.outputs.std }}"
-          printf "pull test std ========================\n${{ steps.pull-test-2.outputs.std }}"
+          PULL_TEST_STD='${{ steps.pull-test-2.outputs.std }}'
+          printf "\n=======================\npull test std\n========================\n${{ steps.pull-test-2.outputs.std }}"
           [[ ! -z "$(echo $PULL_TEST_STD | head -n 1)" ]] || exit 100
           [[ ! -z "$(echo $PULL_TEST_STD | grep 'Lock file /tmp/registry-pull-lock-10.15.4 found')" ]] || exit 101
           

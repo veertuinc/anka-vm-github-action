@@ -1,15 +1,24 @@
+const core = require('@actions/core');
+const execute = require('./execute');
+const prepare = require('./prepare');
+
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 module.exports.sleep = sleep;
 
 async function getVMLabel(ankaCustomVMLabel) {
+  if (process.env[`${process.env['GITHUB_ACTION']}_vmLabel`] !== undefined) { // return the existing VM's label
+    return process.env[`${process.env['GITHUB_ACTION']}_vmLabel`]
+  }
   if (typeof(ankaCustomVMLabel) === "undefined" || ankaCustomVMLabel.length === 0) {
-    return `github-actions-\${GITHUB_REPOSITORY}-\${GITHUB_RUN_NUMBER}-\${GITHUB_JOB}-\${GITHUB_ACTION}`
+    var vmLabel = `github-actions-${process.env['GITHUB_REPOSITORY']}-${process.env['GITHUB_RUN_NUMBER']}-${process.env['GITHUB_JOB']}-${process.env['GITHUB_ACTION']}`
   } else {
     // Needs a random number to prevent collision (we use GITHUB_RUN_NUMBER and GITHUB_ACTION for this if user doesn't specify a label); might be removed in later versions
-    return `${ankaCustomVMLabel}-${Math.floor(Math.random() * 9999) + 1}`
+    var vmLabel = `${ankaCustomVMLabel}-${Math.floor(Math.random() * 9999) + 1}`
   }
+  core.exportVariable(`${process.env['GITHUB_ACTION']}_vmLabel`, vmLabel);
+  return vmLabel
 }
 module.exports.getVMLabel = getVMLabel;
 
@@ -45,3 +54,17 @@ async function turnStringIntoObject(hostCommandOptions,options) {
   return options
 }
 module.exports.turnStringIntoObject = turnStringIntoObject;
+
+
+async function cleanup(ankaCustomVMLabel,hostCommandOptions,ankaTemplate,lockFileLocation) {
+  try {
+    if (process.env[`${process.env['GITHUB_ACTION']}_isCreated`] === 'true') { // Prevent the delete if the VM was never created
+      await execute.nodeCommands(`anka delete --yes ${await getVMLabel(ankaCustomVMLabel)}`,await turnStringIntoObject(hostCommandOptions,{ silent: false }),execute.STD)
+      core.exportVariable(`${process.env['GITHUB_ACTION']}_isCreated`, false);
+    }
+    await prepare.deleteLockFile(ankaTemplate,lockFileLocation)
+  } catch (error) {
+    throw new Error(`Cleanup failed:\n${error.stack}`); 
+  }
+}
+module.exports.cleanup = cleanup;
