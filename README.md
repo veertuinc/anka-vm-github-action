@@ -34,7 +34,7 @@ jobs:
 
 The above example will clone your project repo to the github action runner's working directory, pull the Template `10.15.4` and Tag `base:port-forward-22:xcode11-v1` from the Registry, prepare an Anka VM using that Template and Tag, execute the commands inside of the VM ensuring Environment Variables are passed in with `anka-run-options: "--env"`, and then upload artifacts `./log.txt` and `./build/binaryfile-v1` from the current directory (which is mounted by default into the VM).
 
-> **Build and Test time can be significantly impacted by the default host -> guest mount. It's suggested that you use `anka-run-options: "--wait-network --wait-time --no-volume"` and then git clone your repo inside of `commands:`.**
+> **Build and Test time can be significantly impacted by the default host -> guest mount. It's suggested that you use `anka-run-options: "--wait-network --wait-time --no-volume"` and then git clone your repo inside of `commands:`. Or, if you need to upload artifacts (requires they exist on the host), just cd out of the mounted directory (`/private/var/tmp/ankafs.0`) inside of the VM and then do the git clone so you can execute your builds and tests. This allows you to then move the files you want to upload as an artifact back into the mounted directory so they are seen on the host.**
 
 ### Inputs
 
@@ -80,6 +80,7 @@ These are defined under the `with:` mapping key inside of your workflow yaml.
 - Defaults to /tmp
 #### `artifact-files`
 - **Each file you wish to upload and include in the final artifact, newline separated**
+- Requires a host <-> guest mounted volume so that the artifact creation/upload code, running on the host, can see the artifacts that were created inside of the VM.
 #### `artifact-archive-file-name`
 - **Name of the artifact (archive) that contains all of the files specified in the `artifact-files` input**
 - Defaults to "artifact"
