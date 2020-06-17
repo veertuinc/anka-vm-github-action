@@ -1,7 +1,7 @@
 ## Using the (BETA) Anka GitHub Action
 
 1. Install the [Anka Virtualization CLI](https://github.com/veertuinc/getting-started#initial-setup) onto a macOS host machine. You'll need a [Template and Tag](https://github.com/veertuinc/getting-started#create-templatebash) generated.
-1. Install and ensure you have registered a shared (org level; found under org settings/actions) _or_ project specific runner (found under repo settings/actions) with GitHub. These runners need to be running on the host machines you run your Anka Virtualization CLI.
+1. Install and ensure you have registered a shared (org level; found under org settings/actions) _or_ project specific self-hosted runner (found under repo settings/actions) with GitHub. These runners need to be running on the host machines you run your Anka Virtualization CLI.
 1. Include a `.github/workflows/{whatever}.yml` in your repo
 2. Make sure to set your mapping key `uses:` to `veertuinc/anka-vm-github-action@vX.X.X`
 3. There are a few required key/values you need to include under `with:`: `anka-template` and `commands` (see the Inputs section for more information)
@@ -41,26 +41,19 @@ The above example will clone your project repo to the github action runner's wor
 These are defined under the `with:` mapping key inside of your workflow yaml.
 
 #### `anka-template`
-
 - **Name or UUID of your Anka Template**
 - **[Required]**
-
 #### `commands`
-
 - **Commands you wish to run inside of the Anka VM**
 - **[Required]**
 - You can use `commands: |` for multi-line input or a simple string
-
 #### `anka-tag`
-
 - **Name of Anka Tag (optional)**
 - defaults to latest tag
-
 #### `anka-custom-vm-label`
 - **Label for the cloned VM that will execute your code**
 - Defaults to `github-actions-${GITHUB_REPOSITORY}-${GITHUB_RUN_NUMBER}-${GITHUB_JOB}-${GITHUB_ACTION}`
 - Your custom label will have a random number added to the end of it to prevent collisions when two VMs are running on the same node with the same label
-
 #### `host-pre-commands`
 - **Commands you wish to run outside on the node (host) BEFORE preparation of and execution inside the VM**
 #### `host-post-commands`
