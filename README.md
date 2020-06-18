@@ -148,6 +148,7 @@ There are two types of tests we perform:
 2. Functional testing using a workflow yaml (not in this repo)
 
 ### TO-DO
+- Figure out how to handle agent lost situations (steps just run indefinitely)
 - Support multiple artifacts and files for those artifacts
 - Better tests with mocks so we can avoid so much functional testing
 - Execution of anka run should happen with `anka run template sh` and then passing into STDIN
