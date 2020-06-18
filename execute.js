@@ -30,7 +30,11 @@ async function nodeCommands(commands,hostCommandOptions,existingSTD) {
     }
   }
   // Execute
-  await exec.exec('bash', ['-c', commands], options);
+  try {
+    await exec.exec('bash', ['-c', commands], options);
+  } catch(error) {
+    throw new Error(`nodeCommands exec.exec\n${error.stack}`)
+  }
   // Return STD outputs
   exports.STD = STD;
   exports.finalHostCommandOptions = options; // used in tests

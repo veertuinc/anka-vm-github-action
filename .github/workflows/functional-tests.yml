@@ -17,7 +17,7 @@ jobs:
           anka-template: "10.15.4"
           anka-tag: "base"
           anka-run-options: "-n"
-          commands: "echo 123"
+          commands: "echo \"123\""
 
   functional-tests:
     runs-on: [self-hosted, macOS]

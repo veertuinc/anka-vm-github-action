@@ -2,11 +2,16 @@ let execute = require('./execute');
 
 describe('execute functions', () => {
   
-  let options = "{ silent: true }"
+  let options = "{ silent: false }"
   describe('nodeCommands', () => {
     test('basic', async() => {
       await execute.nodeCommands("echo 123",options)
       await expect(`${execute.STD.trim()}`).toBe("123");
+    });
+    test('fail with bad command option', async() => {
+      await expect(
+        execute.nodeCommands("java --version",options)
+      ).rejects.toThrowError(/failed with exit code 1/)
     });
     test('fail with single quotes', async() => {
       await expect(
