@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: build
         id: build
-        uses: veertuinc/anka-vm-github-action@v1.0.0-beta
+        uses: veertuinc/anka-vm-github-action@v1.2.0-beta
         with:
           anka-template: "10.15.4"
           anka-tag: "base:port-forward-22:xcode11-v1"
@@ -106,7 +106,7 @@ jobs:
         run: "sleep 20"
       - name: pull test 2
         id: pull-test-2
-        uses: veertuinc/anka-vm-github-action@v1.1.0-beta
+        uses: veertuinc/anka-vm-github-action@v1.2.0-beta
         with:
           anka-template: "10.15.4"
           anka-tag: "base:port-forward-22"
