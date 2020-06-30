@@ -46,7 +46,6 @@ async function run() {
     //// Start the VM
     await prepare.ankaStart(ankaVMLabel,ankaStartOptions,hostCommandOptions);
     /// Run commands inside VM
-    console.log(`Running commands inside of Anka VM ==============\nAnka run options: ${ankaRunOptions}\n${ankaCommands}\n==============\n`)
     await execute.ankaRun(ankaVMLabel,ankaRunOptions,ankaCommands,hostCommandOptions);
     if (hostPostCommands) {
       await execute.nodeCommands(hostPostCommands,hostCommandOptions,execute.STD);
