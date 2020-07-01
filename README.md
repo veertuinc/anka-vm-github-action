@@ -1,10 +1,11 @@
 ## Using the (BETA) Anka GitHub Action
 
-1. Install the [Anka Virtualization CLI](https://github.com/veertuinc/getting-started#initial-setup) onto a macOS host machine. You'll need a [Template and Tag](https://github.com/veertuinc/getting-started#create-templatebash) generated.
-1. Install and ensure you have registered a shared (org level; found under org settings/actions) _or_ project specific self-hosted runner (found under repo settings/actions) with GitHub. These runners need to be running on the host machines you run your Anka Virtualization CLI.
-1. Include a `.github/workflows/{whatever}.yml` in your repo
-2. Make sure to set your mapping key `uses:` to `veertuinc/anka-vm-github-action@vX.X.X`
-3. There are a few required key/values you need to include under `with:`: `anka-template` and `commands` (see the Inputs section for more information)
+1. Install the [Anka Build Virtualization Software](https://github.com/veertuinc/getting-started#initial-setup) onto a macOS host machine. 
+    - You'll also need an [Anka Template and Tag](https://ankadocs.veertu.com/docs/getting-started/creating-your-first-vm/#understanding-vm-templates-tags-and-disk-usage) (our [getting started repo's create-template script](https://github.com/veertuinc/getting-started/blob/master/ANKA_BUILD_CLOUD/create-template.bash))
+2. Install and ensure you have registered a shared (org level; found under org settings/actions) _or_ project specific self-hosted runner (found under repo settings/actions) with GitHub. These runners need to be running on the host machines you run your Anka Virtualization CLI.
+3. Include a `.github/workflows/{whatever}.yml` in your repo
+4. Make sure to set your mapping key `uses:` to `veertuinc/anka-vm-github-action@vX.X.X`
+5. There are a few required key/values you need to include under `with:`: `anka-template` and `commands` (see the Inputs section for more information)
 
 ```yaml
 name: My Project's CI/CD
@@ -20,19 +21,25 @@ jobs:
         id: build
         uses: veertuinc/anka-vm-github-action@v1.2.0-beta
         with:
-          anka-template: "10.15.4"
+          anka-template: "10.15.5"
           anka-tag: "base:port-forward-22:xcode11-v1"
           anka-run-options: "--env"
           commands: |
-            echo "Starting build process"
-            ./build.sh && \
+            echo "Starting my job!" && \
+            ./prepare.sh
+            COMMAND_OUTPUT=\$(./gradlew test)
+            cat << EOF > /private/var/tmp/ankafs.0/log
+              \$COMMAND_OUTPUT
+              echo "Adding \\\$COMMAND_OUTPUT to /private/var/tmp/ankafs.0/log so it's available on the host $(hostname)"
+              \$(./gradlew build)
+            EOF
             ./cleanup.sh
           artifacts: |
             log.txt
             build/binaryfile-v1
 ```
 
-The above example will clone your project repo to the github action runner's working directory, pull the Template `10.15.4` and Tag `base:port-forward-22:xcode11-v1` from the Registry, prepare an Anka VM using that Template and Tag, execute the commands inside of the VM ensuring Environment Variables are passed in with `anka-run-options: "--env"`, and then upload artifacts `./log.txt` and `./build/binaryfile-v1` from the current directory (which is mounted by default into the VM).
+The above example will clone your project repo to the github action runner's working directory, pull the Template `10.15.5` and Tag `base:port-forward-22:xcode11-v1` from the Registry, prepare an Anka VM using that Template and Tag, execute the commands inside of the VM ensuring Environment Variables are passed in with `anka-run-options: "--env"`, and then upload artifacts `./log.txt` and `./build/binaryfile-v1` from the current directory (which is mounted by default into the VM).
 
 **Build and test time can be significantly impacted by the default host -> guest mount.** It's suggested that you use `anka-run-options: "--wait-network --wait-time --no-volume"` and then git clone your repo inside of `commands:`. Or, if you need to upload artifacts (requires they exist on the host), just cd out of the mounted directory (`/private/var/tmp/ankafs.0`) inside of the VM and then do the git clone so you can execute your builds and tests. This allows you to then move the files you want to upload as an artifact back into the mounted directory so they are seen on the host.**
 
@@ -44,9 +51,20 @@ These are defined under the `with:` mapping key inside of your workflow yaml.
 - **Name or UUID of your Anka Template**
 #### `commands` (multi-line string or regular string) (required)
 - **Commands you wish to run inside of the Anka VM**
-- You can use `commands: |` for multi-line input or a simple string
-- You need to escape double quotes `\"`
-- You need to escape any dollar signs `\$` so that it doesn't interpolate from the host side. Unless of course you wish to pass in something from the host into the VM.
+- You can use `commands: |` for multi-line input OR, you can just use a single line string `commands: "echo 123"`
+- When interpolating in a **multi-line string** (`commands: |`), be sure to use the proper amount of escapes for the desired effect:
+    ```bash
+    \\\$(echo $HOME)
+    \\\$(echo \$HOME)
+    \\\$(echo \\\$HOME)
+    ```
+    will result in...
+    ```bash
+    $(echo /Users/nathanpierce) # HOST level env was interpolated
+    $(echo /Users/anka)         # GUEST level env was interpolated
+    $(echo $HOME)               # No interpolation
+    ```
+- When interpolating in a **regular string** (`commands: "echo 123"`), be sure to use the proper amount of escapes as well, but add one extra due to the extra quotes.
 #### `anka-tag` (string) (optional)
 - **Name of Anka Tag**
 - Defaults to latest tag
@@ -108,7 +126,7 @@ jobs:
         id: pull-test-2
         uses: veertuinc/anka-vm-github-action@v1.2.0-beta
         with:
-          anka-template: "10.15.4"
+          anka-template: "10.15.5"
           anka-tag: "base:port-forward-22"
           commands: |
             env
@@ -122,8 +140,8 @@ jobs:
         run: |
           PULL_TEST_STD="${{ steps.pull-test-2.outputs.std }}"
           printf "pull test std ========================\n$PULL_TEST_STD"
-          [[ ! -z "$(echo \"$PULL_TEST_STD\" | head -n 1)" ]] || exit 50
-          [[ ! -z "$(echo \"$PULL_TEST_STD\" | grep 'Lock file /tmp/registry-pull-lock-10.15.4 found')" ]] || exit 51
+          [[ ! -z "$(echo \\"$PULL_TEST_STD\\" | head -n 1)" ]] || exit 50
+          [[ ! -z "$(echo \\"$PULL_TEST_STD\\" | grep 'Lock file /tmp/registry-pull-lock-10.15.5 found')" ]] || exit 51
           true
 ```
 
@@ -147,9 +165,14 @@ There are two types of tests we perform:
 
 2. Functional testing using a workflow yaml (not in this repo)
 
+### Building
+
+```bash 
+npm run package
+```
+
 ### TO-DO
 - Figure out how to handle agent lost situations (steps just run indefinitely)
 - Support multiple artifacts and files for those artifacts
 - Better tests with mocks so we can avoid so much functional testing
-- Execution of anka run should happen with `anka run template sh` and then passing into STDIN
 - Clone within VM (with skip-clone inputs)

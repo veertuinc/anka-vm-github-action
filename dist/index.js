@@ -1044,7 +1044,8 @@ async function ankaRun(ankaVMLabel,ankaRunOptions,ankaCommands,hostCommandOption
   if (typeof(ankaRunOptions) === "undefined" || ankaRunOptions.length === 0) {
     ankaRunOptions = "--wait-network --wait-time"
   }
-  await nodeCommands(`anka run ${ankaRunOptions} ${ankaVMLabel} bash -c \"${ankaCommands}\"`,hostCommandOptions,STD)
+  // So we can use bash -s + HEREDOC, we need to add proper newlines to commands
+  await nodeCommands(`anka run ${ankaRunOptions} ${ankaVMLabel} bash -s << COMMANDS\n${ankaCommands}\nCOMMANDS`,hostCommandOptions,STD)
 }
 module.exports.ankaRun = ankaRun;
 
@@ -2087,7 +2088,6 @@ async function run() {
     //// Start the VM
     await prepare.ankaStart(ankaVMLabel,ankaStartOptions,hostCommandOptions);
     /// Run commands inside VM
-    console.log(`Running commands inside of Anka VM ==============\nAnka run options: ${ankaRunOptions}\n${ankaCommands}\n==============\n`)
     await execute.ankaRun(ankaVMLabel,ankaRunOptions,ankaCommands,hostCommandOptions);
     if (hostPostCommands) {
       await execute.nodeCommands(hostPostCommands,hostCommandOptions,execute.STD);

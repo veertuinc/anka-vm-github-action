@@ -18,18 +18,18 @@ describe('prepare functions', () => {
   }); // DESCRIBE
   describe('deleteLockFile', () => {
     afterEach(() => {
-      try{ fs.unlinkSync('/tmp/registry-pull-lock-10.15.4'); } catch(error) {}
+      try{ fs.unlinkSync('/tmp/registry-pull-lock-10.15.5'); } catch(error) {}
       core.exportVariable(`${process.env['GITHUB_ACTION']}_isLocked`, false)
     });
     test('file exists', async() => {
       core.exportVariable(`${process.env['GITHUB_ACTION']}_isLocked`, true)
-      fs.closeSync(fs.openSync('/tmp/registry-pull-lock-10.15.4', 'w'));
-      await prepare.deleteLockFile("10.15.4")
-      await expect(fs.existsSync("/tmp/registry-pull-lock-10.15.4")).toBe(false)
+      fs.closeSync(fs.openSync('/tmp/registry-pull-lock-10.15.5', 'w'));
+      await prepare.deleteLockFile("10.15.5")
+      await expect(fs.existsSync("/tmp/registry-pull-lock-10.15.5")).toBe(false)
     }); // TEST
     test('no file, no problem', async() => {
-      await prepare.deleteLockFile("10.15.4")
-      await expect(fs.existsSync("/tmp/registry-pull-lock-10.15.4")).toBe(false)
+      await prepare.deleteLockFile("10.15.5")
+      await expect(fs.existsSync("/tmp/registry-pull-lock-10.15.5")).toBe(false)
     }); // TEST
   }); // DESCRIBE
 });
