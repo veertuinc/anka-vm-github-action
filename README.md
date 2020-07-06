@@ -25,14 +25,8 @@ jobs:
           anka-tag: "base:port-forward-22:xcode11-v1"
           anka-run-options: "--env"
           commands: |
-            echo "Starting my job!" && \
-            ./prepare.sh
-            COMMAND_OUTPUT=\$(./gradlew test)
-            cat << EOF > /private/var/tmp/ankafs.0/log
-              \$COMMAND_OUTPUT
-              echo "Adding \\\$COMMAND_OUTPUT to /private/var/tmp/ankafs.0/log so it's available on the host $(hostname)"
-              \$(./gradlew build)
-            EOF
+            echo \"Starting build process on \$(hostname)\"
+            ./build.sh && \
             ./cleanup.sh
           artifacts: |
             log.txt
@@ -52,7 +46,9 @@ These are defined under the `with:` mapping key inside of your workflow yaml.
 #### `commands` (multi-line string or regular string) (required)
 - **Commands you wish to run inside of the Anka VM**
 - You can use `commands: |` for multi-line input OR, you can just use a single line string `commands: "echo 123"`
-- When interpolating in a **multi-line string** (`commands: |`), be sure to use the proper amount of escapes for the desired effect:
+- You need to escape double quotes `\"`: `commands: "echo \"123\""`
+- You need to escape any dollar signs `\$` so that it doesn't interpolate from the host side. Unless of course you wish to pass in something from the host into the VM.
+- When interpolating, be sure to use the proper amount of escapes for the desired effect:
     ```bash
     \\\$(echo $HOME)
     \\\$(echo \$HOME)
@@ -64,7 +60,6 @@ These are defined under the `with:` mapping key inside of your workflow yaml.
     $(echo /Users/anka)         # GUEST level env was interpolated
     $(echo $HOME)               # No interpolation
     ```
-- When interpolating in a **regular string** (`commands: "echo 123"`), be sure to use the proper amount of escapes as well, but add one extra due to the extra quotes.
 #### `anka-tag` (string) (optional)
 - **Name of Anka Tag**
 - Defaults to latest tag
@@ -133,8 +128,8 @@ jobs:
             ls -laht ./
             ls -laht ../
             pwd
-            echo "HERE" && \
-            echo "THERE HERE WHERE"
+            echo \"HERE\" && \
+            echo \"THERE HERE WHERE\"
 
       - name: Check for output
         run: |
