@@ -1,7 +1,7 @@
 ## Using the (BETA) Anka GitHub Action
 
 1. Install the [Anka Build Virtualization Software](https://github.com/veertuinc/getting-started#initial-setup) onto a macOS host machine. 
-    - You'll also need an [Anka Template and Tag](https://ankadocs.veertu.com/docs/getting-started/creating-your-first-vm/#understanding-vm-templates-tags-and-disk-usage) (our [getting started repo's create-template script](https://github.com/veertuinc/getting-started/blob/master/ANKA_BUILD_CLOUD/create-template.bash))
+    - You'll also need an [Anka Template and Tag](https://ankadocs.veertu.com/docs/getting-started/creating-your-first-vm/#understanding-vm-templates-tags-and-disk-usage) (you can use our [getting started repo's create-template script](https://github.com/veertuinc/getting-started/blob/master/ANKA_BUILD_CLOUD/create-template.bash))
 2. Install and ensure you have registered a shared (org level; found under org settings/actions) _or_ project specific self-hosted runner (found under repo settings/actions) with GitHub. These runners need to be running on the host machines you run your Anka Virtualization CLI.
 3. Include a `.github/workflows/{whatever}.yml` in your repo
 4. Make sure to set your mapping key `uses:` to `veertuinc/anka-vm-github-action@vX.X.X`
@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: build
         id: build
-        uses: veertuinc/anka-vm-github-action@v1.2.0-beta
+        uses: veertuinc/anka-vm-github-action@v1.3.0-beta
         with:
           anka-template: "10.15.5"
           anka-tag: "base:port-forward-22:xcode11-v1"
@@ -119,7 +119,7 @@ jobs:
         run: "sleep 20"
       - name: pull test 2
         id: pull-test-2
-        uses: veertuinc/anka-vm-github-action@v1.2.0-beta
+        uses: veertuinc/anka-vm-github-action@v1.3.0-beta
         with:
           anka-template: "10.15.5"
           anka-tag: "base:port-forward-22"
@@ -170,5 +170,4 @@ npm run package
 - Figure out how to handle agent lost situations (steps just run indefinitely)
 - Support multiple artifacts and files for those artifacts
 - Better tests with mocks so we can avoid so much functional testing
-- Execution of anka run should happen with `anka run template sh` and then passing into STDIN
 - Clone within VM (with skip-clone inputs)

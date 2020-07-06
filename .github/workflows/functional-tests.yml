@@ -17,7 +17,7 @@ jobs:
           anka-template: "10.15.5"
           anka-tag: "base"
           anka-run-options: "-n"
-          commands: "echo \"123\""
+          commands: ""
 
   functional-tests:
     runs-on: [self-hosted, macOS]
@@ -44,6 +44,13 @@ jobs:
             env
             ls -laht ./
             ls -laht ../
+            cat << EOF > /tmp/yourfilehere
+            test"1 23"
+            \\\$(echo $HOME)
+            \\\$(echo \$HOME)
+            \\\$(echo \\\$HOME)
+            EOF
+            cat /tmp/yourfilehere
             pwd
             echo \"HERE\" && \
             echo \"THERE HERE WHERE\"
@@ -125,9 +132,11 @@ jobs:
       # Must single quote output in run: due to quotes in commands: (basic)
       - name: Check for output (testing anything execute.test.js doesn't)
         run: |
+
           PULL_TEST_PREP_TWO_STD='${{ steps.pull-test-prep-2.outputs.std }}'
           printf "\n=======================\npull-test-prep-2 std\n========================\n$PULL_TEST_PREP_TWO_STD"
           [[ ! -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\" | head -n 1)" ]] || exit 1
+          [[ -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep '/Users/anka')" ]] || exit 2
           [[ ! -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep '(base:port-forward-22:brew-git:openjdk-1.8.0_242)')" ]] || exit 3
           [[ ! -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'self1_isPost=true')" ]] || exit 4
           [[ -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'self1_isCreated')" ]] || exit 5
@@ -203,7 +212,7 @@ jobs:
         run: |
           PULL_TEST_STD='${{ steps.pull-test-2.outputs.std }}'
           printf "\n=======================\npull test std\n========================\n${{ steps.pull-test-2.outputs.std }}"
-          [[ ! -z "$(echo $PULL_TEST_STD | head -n 1)" ]] || exit 100
-          [[ ! -z "$(echo $PULL_TEST_STD | grep 'Lock file /tmp/registry-pull-lock-10.15.5 found')" ]] || exit 101
+          [[ ! -z "$(echo \\"$PULL_TEST_STD\\" | head -n 1)" ]] || exit 100
+          [[ ! -z "$(echo \\"$PULL_TEST_STD\\" | grep 'Lock file /tmp/registry-pull-lock-10.15.5 found')" ]] || exit 101
           
           true
