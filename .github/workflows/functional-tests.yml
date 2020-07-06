@@ -14,7 +14,7 @@ jobs:
         uses: ./
         with:
           anka-registry-pull-options: "-s" # Needed to remove other cached tags and cause openjdk pull to take a while so we can test the Lock file
-          anka-template: "10.15.4"
+          anka-template: "10.15.5"
           anka-tag: "base"
           anka-run-options: "-n"
           commands: "echo \"123\""
@@ -29,7 +29,7 @@ jobs:
         uses: ./
         with:
           host-pre-commands: "env"
-          anka-template: "10.15.4"
+          anka-template: "10.15.5"
           anka-tag: "base:port-forward-22:brew-git:openjdk-1.8.0_242"
           commands: "echo 123"
 
@@ -37,7 +37,7 @@ jobs:
         id: basic
         uses: ./
         with:
-          anka-template: "10.15.4"
+          anka-template: "10.15.5"
           anka-tag: "base:port-forward-22:brew-git"
           host-post-commands: "env"
           commands: |
@@ -45,14 +45,21 @@ jobs:
             ls -laht ./
             ls -laht ../
             pwd
-            echo "HERE" && \
-            echo "THERE HERE WHERE"
+            echo \"HERE\" && \
+            echo \"THERE HERE WHERE\"
+            cat << EOF > /tmp/yourfilehere
+            test\"1 23\"
+            \\\$(echo $HOME)
+            \\\$(echo \$HOME)
+            \\\$(echo \\\$HOME)
+            EOF
+            cat /tmp/yourfilehere
 
       - name: chained commands and redirection into file
         id: chained-redirect
         uses: ./
         with:
-          anka-template: "10.15.4"
+          anka-template: "10.15.5"
           commands: "hostname && echo \"test1\" && echo \"Test2\" > /tmp/test && cat /tmp/test"
 
       - name: script execution with args
@@ -60,7 +67,7 @@ jobs:
         uses: ./
         with:
           anka-run-options: "--wait-network --wait-time"
-          anka-template: "10.15.4"
+          anka-template: "10.15.5"
           anka-tag: "base"
           commands: "hostname && ./test.bash 1 2 3 4"
 
@@ -68,7 +75,7 @@ jobs:
         id: inputs-testing
         uses: ./
         with:
-          anka-template: "10.15.4"
+          anka-template: "10.15.5"
           anka-tag: "DOESNOTEXIST"
           skip-registry-pull: true
           anka-custom-vm-label: "custom-label-${GITHUB_RUN_NUMBER}"
@@ -77,8 +84,8 @@ jobs:
             ls -laht ./
             ls -laht ../
             pwd
-            echo "HERE" && \
-            echo "THERE HERE WHERE"
+            echo \"HERE\" && \
+            echo \"THERE HERE WHERE\"
           host-pre-commands: "env && echo PRE COMMANDS"
           host-post-commands: |
             echo POST COMMANDS
@@ -95,7 +102,7 @@ jobs:
         id: artifacts-1
         uses: ./
         with:
-          anka-template: "10.15.4"
+          anka-template: "10.15.5"
           anka-tag: base
           anka-custom-vm-label: "custom-label-${GITHUB_RUN_NUMBER}"
           commands: |
@@ -103,8 +110,8 @@ jobs:
             ls -laht ./ > ./test3
             ls -laht ../ > /private/var/tmp/ankafs.0/test2
             pwd > test1
-            echo "HERE" && \
-            echo "THERE HERE WHERE"
+            echo \"HERE\" && \
+            echo \"THERE HERE WHERE\"
           host-post-commands: "env && echo POST COMMANDS && echo \"CWD: $(pwd)\""
           anka-start-options: "-f"
           artifact-archive-file-name: "test-artifact"
@@ -120,50 +127,53 @@ jobs:
         run: |
           PULL_TEST_PREP_TWO_STD='${{ steps.pull-test-prep-2.outputs.std }}'
           printf "\n=======================\npull-test-prep-2 std\n========================\n$PULL_TEST_PREP_TWO_STD"
-          [[ ! -z "$(echo \"$PULL_TEST_PREP_TWO_STD\" | head -n 1)" ]] || exit 1
-          [[ ! -z "$(echo \"$PULL_TEST_PREP_TWO_STD\"  | grep '(base:port-forward-22:brew-git:openjdk-1.8.0_242)')" ]] || exit 3
-          [[ ! -z "$(echo \"$PULL_TEST_PREP_TWO_STD\"  | grep 'self1_isPost=true')" ]] || exit 4
-          [[ -z "$(echo \"$PULL_TEST_PREP_TWO_STD\"  | grep 'self1_isCreated')" ]] || exit 5
-          [[ -z "$(echo \"$PULL_TEST_PREP_TWO_STD\"  | grep 'self1_isLocked')" ]] || exit 6
+          [[ ! -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\" | head -n 1)" ]] || exit 1
+          [[ ! -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep '(base:port-forward-22:brew-git:openjdk-1.8.0_242)')" ]] || exit 3
+          [[ ! -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'self1_isPost=true')" ]] || exit 4
+          [[ -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'self1_isCreated')" ]] || exit 5
+          [[ -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'self1_isLocked')" ]] || exit 6
 
           BASIC_STD='${{ steps.basic.outputs.std }}'
           printf "\n=======================\nbasic std\n========================\n$BASIC_STD"
-          [[ ! -z "$(echo \"$BASIC_STD\" | head -n 1)" ]] || exit 10
-          [[ -z "$(echo \"$BASIC_STD\" | grep 'base:port-forward-22:brew-git:openjdk-')" ]] || exit 11
-          [[ ! -z "$(echo \"$BASIC_STD\" | grep '(base:port-forward-22:brew-git)')" ]] || exit 12
-          [[ ! -z "$(echo \"$BASIC_STD\" | grep 'self2_isPost=true')" ]] || exit 13
-          [[ ! -z "$(echo \"$BASIC_STD\"| grep 'self2_isCreated=true')" ]] || exit 14
-          [[ ! -z "$(echo \"$BASIC_STD\" | grep 'self2_isLocked=false')" ]] || exit 15
+          [[ ! -z "$(echo \\"$BASIC_STD\\" | head -n 1)" ]] || exit 10
+          [[ -z "$(echo \\"$BASIC_STD\\" | grep 'base:port-forward-22:brew-git:openjdk-')" ]] || exit 11
+          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep '(base:port-forward-22:brew-git)')" ]] || exit 12
+          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep 'self2_isPost=true')" ]] || exit 13
+          [[ ! -z "$(echo \\"$BASIC_STD\\"| grep 'self2_isCreated=true')" ]] || exit 14
+          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep 'self2_isLocked=false')" ]] || exit 15
+          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep '^$(echo /Users/anka)')" ]] || exit 16
+          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep '^$(echo $HOME)')" ]] || exit 17
+          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep '^$(echo /Users/' | grep -v anka)" ]] || exit 18
       
           CHAINED_REDIRECT_STD='${{ steps.chained-redirect.outputs.std }}'
           printf "\n=======================\nchained-redirect stdout\n========================\n$CHAINED_REDIRECT_STD"
-          [[ ! -z "$(echo \"$CHAINED_REDIRECT_STD\" | head -n 1)" ]] || exit 20
+          [[ ! -z "$(echo \\"$CHAINED_REDIRECT_STD\\" | head -n 1)" ]] || exit 20
 
           SCRIPT_AND_ARGS_STD='${{ steps.script-and-args.outputs.std }}'
           printf "\n=======================\nscript-and-args stdout\n========================\n$SCRIPT_AND_ARGS_STD"
-          [[ ! -z "$(echo \"$SCRIPT_AND_ARGS_STD\" | head -n 1)" ]] || exit 30
-          [[ ! -z "$(echo \"$SCRIPT_AND_ARGS_STD\" | grep '| 10.15.4 (base)')" ]] || exit 31
+          [[ ! -z "$(echo \\"$SCRIPT_AND_ARGS_STD\\" | head -n 1)" ]] || exit 30
+          [[ ! -z "$(echo \\"$SCRIPT_AND_ARGS_STD\\" | grep '| 10.15.5 (base)')" ]] || exit 31
 
           INPUTS_TESTING_STD='${{ steps.inputs-testing.outputs.std }}'
           printf "\n=======================\ninputs-testing stdout\n========================\n$INPUTS_TESTING_STD"
-          [[ ! -z "$(echo \"$INPUTS_TESTING_STD\" | head -n 1)" ]] || exit 40
-          [[ ! -z "$(echo \"$INPUTS_TESTING_STD\" | grep 'PRE COMMANDS')" ]] || exit 41
-          [[ ! -z "$(echo \"$INPUTS_TESTING_STD\" | grep 'POST COMMANDS')" ]] || exit 42
-          [[ ! -z "$(echo \"$INPUTS_TESTING_STD\" | grep '| custom-label-')" ]] || exit 43
-          [[ ! -z "$(echo \"$INPUTS_TESTING_STD\" | grep 'CWD: /private/tmp')" ]] || exit 44
-          [[ ! -z "$(echo \"$INPUTS_TESTING_STD\" | grep 'PWD=/private/tmp')" ]] || exit 45
-          [[ ! -z "$(echo \"$INPUTS_TESTING_STD\"  | grep 'self5_isPost=true')" ]] || exit 46
-          [[ -z "$(echo \"$INPUTS_TESTING_STD\"  | grep 'self5_isCreated')" ]] || exit 47
-          [[ -z "$(echo \"$INPUTS_TESTING_STD\"  | grep 'self5_isLocked')" ]] || exit 48
+          [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | head -n 1)" ]] || exit 40
+          [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'PRE COMMANDS')" ]] || exit 41
+          [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'POST COMMANDS')" ]] || exit 42
+          [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep '| custom-label-')" ]] || exit 43
+          [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'CWD: /private/tmp')" ]] || exit 44
+          [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'PWD=/private/tmp')" ]] || exit 45
+          [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\"  | grep 'self5_isPost=true')" ]] || exit 46
+          [[ -z "$(echo \\"$INPUTS_TESTING_STD\\"  | grep 'self5_isCreated')" ]] || exit 47
+          [[ -z "$(echo \\"$INPUTS_TESTING_STD\\"  | grep 'self5_isLocked')" ]] || exit 48
 
           ARTIFACTS_ONE_STD='${{ steps.artifacts-1.outputs.std }}'
           printf "\n=======================\nartifacts-1 stdout\n========================\n$ARTIFACTS_ONE_STD"
-          [[ ! -z "$(echo \"$ARTIFACTS_ONE_STD\" | head -n 1)" ]] || exit 50
-          [[ ! -z "$(echo \"$ARTIFACTS_ONE_STD\"  | grep 'Created and uploaded artifact test-artifact')" ]] || exit 51
-          [[ ! -z "$(echo \"$ARTIFACTS_ONE_STD\"  | grep 'Archive contents:.*/test1.*/test2.*/test3')" ]] || exit 52
-          [[ ! -z "$(echo \"$ARTIFACTS_ONE_STD\"   | grep 'self6_isPost=true')" ]] || exit 53
-          [[ ! -z "$(echo \"$ARTIFACTS_ONE_STD\"   | grep 'self6_isCreated=true')" ]] || exit 54
-          [[ ! -z "$(echo \"$ARTIFACTS_ONE_STD\"   | grep 'self6_isLocked=false')" ]] || exit 55
+          [[ ! -z "$(echo \\"$ARTIFACTS_ONE_STD\\" | head -n 1)" ]] || exit 50
+          [[ ! -z "$(echo \\"$ARTIFACTS_ONE_STD\\"  | grep 'Created and uploaded artifact test-artifact')" ]] || exit 51
+          [[ ! -z "$(echo \\"$ARTIFACTS_ONE_STD\\"  | grep 'Archive contents:.*/test1.*/test2.*/test3')" ]] || exit 52
+          [[ ! -z "$(echo \\"$ARTIFACTS_ONE_STD\\"   | grep 'self6_isPost=true')" ]] || exit 53
+          [[ ! -z "$(echo \\"$ARTIFACTS_ONE_STD\\"   | grep 'self6_isCreated=true')" ]] || exit 54
+          [[ ! -z "$(echo \\"$ARTIFACTS_ONE_STD\\"   | grep 'self6_isLocked=false')" ]] || exit 55
 
           true
               
@@ -179,7 +189,7 @@ jobs:
         id: pull-test-2
         uses: ./
         with:
-          anka-template: "10.15.4"
+          anka-template: "10.15.5"
           anka-tag: "base:port-forward-22"
           commands: |
             env
@@ -194,6 +204,6 @@ jobs:
           PULL_TEST_STD='${{ steps.pull-test-2.outputs.std }}'
           printf "\n=======================\npull test std\n========================\n${{ steps.pull-test-2.outputs.std }}"
           [[ ! -z "$(echo $PULL_TEST_STD | head -n 1)" ]] || exit 100
-          [[ ! -z "$(echo $PULL_TEST_STD | grep 'Lock file /tmp/registry-pull-lock-10.15.4 found')" ]] || exit 101
+          [[ ! -z "$(echo $PULL_TEST_STD | grep 'Lock file /tmp/registry-pull-lock-10.15.5 found')" ]] || exit 101
           
           true
