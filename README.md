@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: build
         id: build
-        uses: veertuinc/anka-vm-github-action@v1.3.0-beta
+        uses: veertuinc/anka-vm-github-action@v1.2.1-beta
         with:
           anka-template: "10.15.5"
           anka-tag: "base:port-forward-22:xcode11-v1"
@@ -45,8 +45,8 @@ These are defined under the `with:` mapping key inside of your workflow yaml.
 - **Name or UUID of your Anka Template**
 #### `commands` (multi-line string or regular string) (required)
 - **Commands you wish to run inside of the Anka VM**
-- You can use `commands: |` for multi-line input OR, you can just use a single line string `commands: "echo 123"`
-- You need to escape double quotes `\"`: `commands: "echo \"123\""`
+- You can use `commands: |` for multi-line input, OR, you can just use a single line string `commands: "echo 123"`
+- You need to escape nested/inner double quotes `\"`: `commands: "echo \"123\""`
 - You need to escape any dollar signs `\$` so that it doesn't interpolate from the host side. Unless of course you wish to pass in something from the host into the VM.
 - When interpolating, be sure to use the proper amount of escapes for the desired effect:
     ```bash
@@ -119,7 +119,7 @@ jobs:
         run: "sleep 20"
       - name: pull test 2
         id: pull-test-2
-        uses: veertuinc/anka-vm-github-action@v1.3.0-beta
+        uses: veertuinc/anka-vm-github-action@v1.2.1-beta
         with:
           anka-template: "10.15.5"
           anka-tag: "base:port-forward-22"
