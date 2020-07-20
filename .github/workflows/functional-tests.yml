@@ -45,7 +45,7 @@ jobs:
             ls -laht ./
             ls -laht ../
             cat << EOF > /tmp/yourfilehere
-            test"1 23"
+            test\"1 23\"
             \\\$(echo $HOME)
             \\\$(echo \$HOME)
             \\\$(echo \\\$HOME)
@@ -54,13 +54,6 @@ jobs:
             pwd
             echo \"HERE\" && \
             echo \"THERE HERE WHERE\"
-            cat << EOF > /tmp/yourfilehere
-            test\"1 23\"
-            \\\$(echo $HOME)
-            \\\$(echo \$HOME)
-            \\\$(echo \\\$HOME)
-            EOF
-            cat /tmp/yourfilehere
 
       - name: chained commands and redirection into file
         id: chained-redirect
@@ -132,7 +125,6 @@ jobs:
       # Must single quote output in run: due to quotes in commands: (basic)
       - name: Check for output (testing anything execute.test.js doesn't)
         run: |
-
           PULL_TEST_PREP_TWO_STD='${{ steps.pull-test-prep-2.outputs.std }}'
           printf "\n=======================\npull-test-prep-2 std\n========================\n$PULL_TEST_PREP_TWO_STD"
           [[ ! -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\" | head -n 1)" ]] || exit 1

@@ -46,6 +46,6 @@ async function ankaRun(ankaVMLabel,ankaRunOptions,ankaCommands,hostCommandOption
     ankaRunOptions = "--wait-network --wait-time"
   }
   // So we can use bash -s + HEREDOC, we need to add proper newlines to commands
-  await nodeCommands(`anka run ${ankaRunOptions} ${ankaVMLabel} bash -s << COMMANDS\n${ankaCommands}\nCOMMANDS`,hostCommandOptions,STD)
+  await nodeCommands(`anka run ${ankaRunOptions} ${ankaVMLabel} bash -c \"${ankaCommands}\"`,hostCommandOptions,STD)
 }
 module.exports.ankaRun = ankaRun;
