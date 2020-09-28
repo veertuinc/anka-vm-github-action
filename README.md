@@ -1,8 +1,9 @@
-## Using the (BETA) Anka GitHub Action
+## Using the (BETA) Anka VM GitHub Action
 
 1. Install the [Anka Build Virtualization Software](https://github.com/veertuinc/getting-started#initial-setup) onto a macOS host machine. 
-    - You'll also need an [Anka Template and Tag](https://ankadocs.veertu.com/docs/getting-started/creating-your-first-vm/#understanding-vm-templates-tags-and-disk-usage) (you can use our [getting started repo's create-template script](https://github.com/veertuinc/getting-started/blob/master/ANKA_BUILD_CLOUD/create-template.bash))
+    - You'll also need an [Anka Template and Tag](https://ankadocs.veertu.com/docs/getting-started/creating-your-first-vm/#understanding-vm-templates-tags-and-disk-usage) (you can use our [getting started repo's create-template script](https://github.com/veertuinc/getting-started#create-vm-templatebash))
 2. Install and ensure you have registered a shared (org level; found under org settings/actions) _or_ project specific self-hosted runner (found under repo settings/actions) with GitHub. These runners need to be running on the host machines you run your Anka Virtualization CLI.
+    > If you want ephemeral VMs to spin up for your CI/CD job, install the github actions runner inside of the node running the Anka Build Virtualization software. **For persistent VMs, install the runner inside of the VM and don't use this action.**
 3. Include a `.github/workflows/{whatever}.yml` in your repo
 4. Make sure to set your mapping key `uses:` to `veertuinc/anka-vm-github-action@vX.X.X`
 5. There are a few required key/values you need to include under `with:`: `anka-template` and `commands` (see the Inputs section for more information)
