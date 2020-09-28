@@ -22,7 +22,7 @@ jobs:
         id: build
         uses: veertuinc/anka-vm-github-action@v1.2.1-beta
         with:
-          anka-template: "10.15.5"
+          anka-template: "10.15.6"
           anka-tag: "base:port-forward-22:xcode11-v1"
           anka-run-options: "--env"
           commands: |
@@ -34,7 +34,7 @@ jobs:
             build/binaryfile-v1
 ```
 
-The above example will clone your project repo to the github action runner's working directory, pull the Template `10.15.5` and Tag `base:port-forward-22:xcode11-v1` from the Registry, prepare an Anka VM using that Template and Tag, execute the commands inside of the VM ensuring Environment Variables are passed in with `anka-run-options: "--env"`, and then upload artifacts `./log.txt` and `./build/binaryfile-v1` from the current directory (which is mounted by default into the VM).
+The above example will clone your project repo to the github action runner's working directory, pull the Template `10.15.6` and Tag `base:port-forward-22:xcode11-v1` from the Registry, prepare an Anka VM using that Template and Tag, execute the commands inside of the VM ensuring Environment Variables are passed in with `anka-run-options: "--env"`, and then upload artifacts `./log.txt` and `./build/binaryfile-v1` from the current directory (which is mounted by default into the VM).
 
 **Build and test time can be significantly impacted by the default host -> guest mount.** It's suggested that you use `anka-run-options: "--wait-network --wait-time --no-volume"` and then git clone your repo inside of `commands:`. Or, if you need to upload artifacts (requires they exist on the host), just cd out of the mounted directory (`/private/var/tmp/ankafs.0`) inside of the VM and then do the git clone so you can execute your builds and tests. This allows you to then move the files you want to upload as an artifact back into the mounted directory so they are seen on the host.**
 
@@ -122,7 +122,7 @@ jobs:
         id: pull-test-2
         uses: veertuinc/anka-vm-github-action@v1.2.1-beta
         with:
-          anka-template: "10.15.5"
+          anka-template: "10.15.6"
           anka-tag: "base:port-forward-22"
           commands: |
             env
@@ -137,7 +137,7 @@ jobs:
           PULL_TEST_STD="${{ steps.pull-test-2.outputs.std }}"
           printf "pull test std ========================\n$PULL_TEST_STD"
           [[ ! -z "$(echo \\"$PULL_TEST_STD\\" | head -n 1)" ]] || exit 50
-          [[ ! -z "$(echo \\"$PULL_TEST_STD\\" | grep 'Lock file /tmp/registry-pull-lock-10.15.5 found')" ]] || exit 51
+          [[ ! -z "$(echo \\"$PULL_TEST_STD\\" | grep 'Lock file /tmp/registry-pull-lock-10.15.6 found')" ]] || exit 51
           true
 ```
 

@@ -10,7 +10,7 @@ jobs:
         id: command-failure
         uses: ./
         with:
-          anka-template: "10.15.5"
+          anka-template: "10.15.6"
           anka-tag: "base"
           anka-run-options: "-n"
           commands: "java -version || if [ \\$? -gt 0 ]; then echo failed; else exit 20; fi"
@@ -21,7 +21,7 @@ jobs:
         id: multi-line-commands-failure
         uses: ./
         with:
-          anka-template: "10.15.5"
+          anka-template: "10.15.6"
           anka-tag: "base"
           anka-run-options: "-n"
           commands: |
@@ -35,7 +35,7 @@ jobs:
   #       id: bad-host-command-option
   #       uses: ./
   #       with:
-  #         anka-template: "10.15.5"
+  #         anka-template: "10.15.6"
   #         anka-tag: "base"
   #         anka-run-options: "-n"
   #         host-command-options: "1231!!"

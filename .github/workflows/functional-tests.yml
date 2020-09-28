@@ -14,7 +14,7 @@ jobs:
         uses: ./
         with:
           anka-registry-pull-options: "-s" # Needed to remove other cached tags and cause openjdk pull to take a while so we can test the Lock file
-          anka-template: "10.15.5"
+          anka-template: "10.15.6"
           anka-tag: "base"
           anka-run-options: "-n"
           commands: ""
@@ -29,7 +29,7 @@ jobs:
         uses: ./
         with:
           host-pre-commands: "env"
-          anka-template: "10.15.5"
+          anka-template: "10.15.6"
           anka-tag: "base:port-forward-22:brew-git:openjdk-1.8.0_242"
           commands: "echo 123"
 
@@ -37,7 +37,7 @@ jobs:
         id: basic
         uses: ./
         with:
-          anka-template: "10.15.5"
+          anka-template: "10.15.6"
           anka-tag: "base:port-forward-22:brew-git"
           host-post-commands: "env"
           commands: |
@@ -59,7 +59,7 @@ jobs:
         id: chained-redirect
         uses: ./
         with:
-          anka-template: "10.15.5"
+          anka-template: "10.15.6"
           commands: "hostname && echo \"test1\" && echo \"Test2\" > /tmp/test && cat /tmp/test"
 
       - name: script execution with args
@@ -67,7 +67,7 @@ jobs:
         uses: ./
         with:
           anka-run-options: "--wait-network --wait-time"
-          anka-template: "10.15.5"
+          anka-template: "10.15.6"
           anka-tag: "base"
           commands: "hostname && ./test.bash 1 2 3 4"
 
@@ -75,7 +75,7 @@ jobs:
         id: inputs-testing
         uses: ./
         with:
-          anka-template: "10.15.5"
+          anka-template: "10.15.6"
           anka-tag: "DOESNOTEXIST"
           skip-registry-pull: true
           anka-custom-vm-label: "custom-label-${GITHUB_RUN_NUMBER}"
@@ -102,7 +102,7 @@ jobs:
         id: artifacts-1
         uses: ./
         with:
-          anka-template: "10.15.5"
+          anka-template: "10.15.6"
           anka-tag: base
           anka-custom-vm-label: "custom-label-${GITHUB_RUN_NUMBER}"
           commands: |
@@ -153,7 +153,7 @@ jobs:
           SCRIPT_AND_ARGS_STD='${{ steps.script-and-args.outputs.std }}'
           printf "\n=======================\nscript-and-args stdout\n========================\n$SCRIPT_AND_ARGS_STD"
           [[ ! -z "$(echo \\"$SCRIPT_AND_ARGS_STD\\" | head -n 1)" ]] || exit 30
-          [[ ! -z "$(echo \\"$SCRIPT_AND_ARGS_STD\\" | grep '| 10.15.5 (base)')" ]] || exit 31
+          [[ ! -z "$(echo \\"$SCRIPT_AND_ARGS_STD\\" | grep '| 10.15.6 (base)')" ]] || exit 31
 
           INPUTS_TESTING_STD='${{ steps.inputs-testing.outputs.std }}'
           printf "\n=======================\ninputs-testing stdout\n========================\n$INPUTS_TESTING_STD"
@@ -190,7 +190,7 @@ jobs:
         id: pull-test-2
         uses: ./
         with:
-          anka-template: "10.15.5"
+          anka-template: "10.15.6"
           anka-tag: "base:port-forward-22"
           commands: |
             env
@@ -205,6 +205,6 @@ jobs:
           PULL_TEST_STD='${{ steps.pull-test-2.outputs.std }}'
           printf "\n=======================\npull test std\n========================\n${{ steps.pull-test-2.outputs.std }}"
           [[ ! -z "$(echo \\"$PULL_TEST_STD\\" | head -n 1)" ]] || exit 100
-          [[ ! -z "$(echo \\"$PULL_TEST_STD\\" | grep 'Lock file /tmp/registry-pull-lock-10.15.5 found')" ]] || exit 101
+          [[ ! -z "$(echo \\"$PULL_TEST_STD\\" | grep 'Lock file /tmp/registry-pull-lock-10.15.6 found')" ]] || exit 101
           
           true
