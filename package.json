@@ -1,6 +1,6 @@
 {
   "name": "anka-vm-github-action",
-  "version": "1.2.1-beta",
+  "version": "1.2.2-beta",
   "description": "A GitHub Action for running commands within Anka VMs",
   "main": "index.js",
   "scripts": {
