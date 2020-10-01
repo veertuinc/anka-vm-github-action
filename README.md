@@ -120,7 +120,7 @@ jobs:
         run: "sleep 20"
       - name: pull test 2
         id: pull-test-2
-        uses: veertuinc/anka-vm-github-action@v1.2.1-beta
+        uses: veertuinc/anka-vm-github-action@v1.2.2-beta
         with:
           anka-template: "10.15.6"
           anka-tag: "base:port-forward-22"
