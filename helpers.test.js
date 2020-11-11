@@ -26,29 +26,29 @@ describe('helper functions', () => {
       expect(process.env["self3_vmLabel"]).toMatch(/build-vms-\d+/)
     }); // TEST
   }); // DESCRIBE
-  describe('turnStringIntoObject', () => {
+  describe('mergeOptions', () => {
     test('no args', async() => {
-      expect(await helpers.turnStringIntoObject()).toEqual({})
+      expect(await helpers.mergeOptions()).toEqual({})
     }); // TEST
     test('hostCommandOptions: populated (string)', async() => {
-      expect(await helpers.turnStringIntoObject("{ silent: true, cwd: \"/tmp\"}")).toEqual({silent: true, cwd: "/tmp"})
+      expect(await helpers.mergeOptions("{ silent: true, cwd: \"/tmp\"}")).toEqual({silent: true, cwd: "/tmp"})
     }); // TEST
     test('hostCommandOptions: populated (single quotes ERROR)', async() => {
       await expect(
-       helpers.turnStringIntoObject("{ silent: true, cwd: '/tmp'}")
+       helpers.mergeOptions("{ silent: true, cwd: '/tmp'}")
       ).rejects.toThrowError(/inside of a string/)
     }); // TEST
     test('hostCommandOptions (string), options (object)', async() => {
-        expect(await helpers.turnStringIntoObject("{ cwd: \"/tmp\" }",{silent: true})).toEqual({silent: true, cwd: "/tmp"})
+        expect(await helpers.mergeOptions("{ cwd: \"/tmp\" }",{silent: true})).toEqual({silent: true, cwd: "/tmp"})
     }); // TEST
     test('hostCommandOptions (undefined), options (object)', async() => {
-      expect(await helpers.turnStringIntoObject(undefined,{silent: true})).toEqual({silent: true})
+      expect(await helpers.mergeOptions(undefined,{silent: true})).toEqual({silent: true})
     }); // TEST
     test('hostCommandOptions (object), options (object)', async() => {
-      expect(await helpers.turnStringIntoObject({silent:false},{silent: true})).toEqual({silent: false})
+      expect(await helpers.mergeOptions({silent:false},{silent: true})).toEqual({silent: false})
     }); // TEST
     test('hostCommandOptions (object), options (undefined)', async() => {
-      expect(await helpers.turnStringIntoObject({silent:false},undefined)).toEqual({silent: false})
+      expect(await helpers.mergeOptions({silent:false},undefined)).toEqual({silent: false})
     }); // TEST
   }); // DESCRIBE
 });
