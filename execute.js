@@ -1,9 +1,10 @@
 const exec = require('@actions/exec'); // EXEC IS NOT A BASH INTERPRETER: https://github.com/actions/toolkit/issues/461
 const helpers = require('./helpers')
+const fs = require('fs');
 
 let STD = ''
 
-async function nodeCommands(commands,hostCommandOptions,existingSTD) {
+async function hostCommands(commands,hostCommandOptions,existingSTD) {
   if (typeof(existingSTD) !== "undefined") { // Reset 
     if (existingSTD.length !== 0) {
       STD = existingSTD
@@ -11,7 +12,7 @@ async function nodeCommands(commands,hostCommandOptions,existingSTD) {
   } else {
     STD = ''
   }
-  var options = await helpers.turnStringIntoObject(hostCommandOptions,{
+  var options = await helpers.mergeOptions(hostCommandOptions,{
     listeners: { // Populate STDOUT AND STDERR
       stdout: (data) => {
         STD += data.toString();
@@ -26,26 +27,51 @@ async function nodeCommands(commands,hostCommandOptions,existingSTD) {
     try {
       await exec.exec('bash', ['-c', `cd -P ${options.cwd} || exit 10`],{silent: true});
     } catch(error) {
-      throw new Error(`cannot find ${options.cwd}`)
+      throw new Error(`exec.exec failed: cannot find ${options.cwd}`)
     }
   }
   // Execute
   try {
     await exec.exec('bash', ['-c', commands], options);
   } catch(error) {
-    throw new Error(`nodeCommands exec.exec\n${error.stack}`)
+    throw new Error(`exec.exec failed:\n${helpers.lastFourLines(STD)}\n${error.stack}`)
   }
   // Return STD outputs
   exports.STD = STD;
   exports.finalHostCommandOptions = options; // used in tests
+  return true
 }
-module.exports.nodeCommands = nodeCommands;
+module.exports.hostCommands = hostCommands;
 
-async function ankaRun(ankaVMLabel,ankaRunOptions,ankaCommands,hostCommandOptions) {
-  if (typeof(ankaRunOptions) === "undefined" || ankaRunOptions.length === 0) {
-    ankaRunOptions = "--wait-network --wait-time"
-  }
+async function ankaRun(ankaVMLabel,ankaRunOptions,ankaVmCommands,hostCommandOptions) {
   // So we can use bash -s + HEREDOC, we need to add proper newlines to commands
-  await nodeCommands(`anka run ${ankaRunOptions} ${ankaVMLabel} bash -c \"${ankaCommands}\"`,hostCommandOptions,STD)
+  await hostCommands(`anka run ${ankaRunOptions} ${ankaVMLabel} bash -c \"${ankaVmCommands}\"`,hostCommandOptions,STD)
 }
 module.exports.ankaRun = ankaRun;
+
+async function ankaCp(direction,location,ankaVmTemplateName,destinationDirectory,hostCommandOptions) {
+  try {
+    if (direction === "in") {
+      if (fs.existsSync(location)) {
+        if (fs.lstatSync(location).isSymbolicLink()) {
+          await hostCommands(`anka cp -fRH ${location}/ ${ankaVmTemplateName}:${destinationDirectory}${helpers.obtainLastPathSection(`${location}`)}`,hostCommandOptions,STD)
+        } else if (
+          (fs.lstatSync(location).isDirectory()) ||
+          (fs.lstatSync(location).isFile())
+        ) {
+          await hostCommands(`anka cp -fa ${location} ${ankaVmTemplateName}:${destinationDirectory}`,hostCommandOptions,STD)
+        } else {
+          throw new Error(`could not determine if "${location}" is a file, folder, symlink`)
+        }
+      } else {
+        throw new Error(`"${location}" does not exist`)
+      }
+    } else { // out
+      await hostCommands(`anka cp -fa ${ankaVmTemplateName}:${location} ${destinationDirectory}`,hostCommandOptions,STD)
+    }
+  } catch (error) {
+    throw new Error(`ankaCp failed:\n${error.stack}`); 
+  }
+  return true
+}
+module.exports.ankaCp = ankaCp;

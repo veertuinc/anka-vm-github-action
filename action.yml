@@ -5,20 +5,20 @@ branding:
   icon: 'cloud'
   color: 'purple'
 inputs:
-  anka-template:
+  anka-vm-template-name:
     description: '(string) (required) name or UUID of your Anka Template'
     required: true
-  anka-tag:
+  anka-vm-tag-name:
     description: '(string) (optional) name of Anka Tag (optional; defaults to latest tag)'
   anka-custom-vm-label:
     description: '(string) (optional) label for the cloned VM that will execute your code (default: github-actions-${GITHUB_REPOSITORY}-${GITHUB_RUN_NUMBER}-${GITHUB_JOB}-${GITHUB_ACTION})'
-  commands:
+  vm-commands:
     description: '(multi-line string or regular string) (required) commands you wish to run inside of the Anka VM'
     required: true
   host-pre-commands:
-    description: '(string) (optional) commands you wish to run outside on the node (host) BEFORE preparation of and execution inside the VM'
+    description: '(string) (optional) commands you wish to run outside on the host BEFORE preparation of and execution inside the VM'
   host-post-commands:
-    description: '(string) (optional) commands you wish to run outside on the node (host) AFTER preparation of and execution inside the VM'
+    description: '(string) (optional) commands you wish to run outside on the host AFTER preparation of and execution inside the VM'
   anka-start-options:
     description: '(string) (optional) options set for the anka start execution'
   anka-run-options:
@@ -28,15 +28,22 @@ inputs:
   host-command-options:
     description: '(string; js object or JSON) (optional) options to use for github actions exec command; must be a js object (do not use single quotes to wrap values; { key: "value" }) or JSON ({ "key": "value" }) inside of a string!\nSupported options: https://github.com/actions/toolkit/blob/master/packages/exec/src/interfaces.ts'
   lock-file-location:
-    description: '(string) (optional) location where the pull/clone lock file exists (defaults to /tmp)'
+    description: '(string) (optional) location where the pull/clone lock file exists (default: "/tmp")'
   artifact-files:
     description: '(multi-line string) (optional) each file you wish to upload and include in the final artifact, newline separated'
   artifact-archive-file-name:
     description: '(string) (optional) name of the artifact (archive) that contains all of the files specified in the artifact-files input (default: "artifact")'
-  artifacts-root-directory:
-    description: '(string) (optional) an absolute or relative file path that denotes the root parent directory of the files being uploaded'
+  artifacts-directory-on-host:
+    description: '(string) (optional) an absolute or relative file path that denotes the host-level directory containing the files being uploaded (default: "./")'
   skip-registry-pull:
-    description: '(boolean) (optional) skip the registry pull; useful if you do not have a registry or it is down and the Template + Tag are already on the node'
+    description: '(boolean) (optional) skip the registry pull; useful if you do not have a registry or it is down and the Template + Tag are already on the host'
+  anka-cp-disable:
+    description: '(boolean) (optional) do not use anka cp command to move files from VM to host (a requirement to upload them as artifacts)'
+  anka-cp-host-paths:
+    description: '(multi-line string) (optional) files and folders you wish to upload from the host into the VM'
+  anka-cp-destination-directory:
+    description: '(string) (optional) destination directory on VM you wish to upload the anka-cp-host-paths into (default: "./")'
+   
 outputs:
   std:
     description: 'the STDOUT and STDERR from the executed commands'

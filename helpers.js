@@ -2,6 +2,25 @@ const core = require('@actions/core');
 const execute = require('./execute');
 const prepare = require('./prepare');
 
+function obtainLastPathSection(path) {
+  var pathArray = path.split("/");
+  var lastIndex = pathArray.length - 1;
+  return pathArray[lastIndex];
+};
+module.exports.obtainLastPathSection = obtainLastPathSection;
+
+function lastFourLines(multiLineString) {
+  var multiLineStringArr = multiLineString.split("\n")
+  for(var cnt=0;cnt<multiLineStringArr.length;cnt++){ // indent
+    if (`${multiLineStringArr[cnt].trim()}` !== "") {
+      multiLineStringArr[cnt] = `STDOUT: ${multiLineStringArr[cnt]}`
+    }
+  }
+  var lastFourLines = multiLineStringArr.slice(multiLineStringArr.length - 4)
+  return `${lastFourLines.join("\n").trim()}`
+}
+module.exports.lastFourLines = lastFourLines;
+
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -31,7 +50,7 @@ async function getArtifactArchiveName(artifactArchiveFileName) {
 }
 module.exports.getArtifactArchiveName = getArtifactArchiveName;
 
-async function turnStringIntoObject(hostCommandOptions,options) {
+async function mergeOptions(hostCommandOptions,options) {
   if (options === undefined) {
     var options = {}
   }
@@ -40,7 +59,7 @@ async function turnStringIntoObject(hostCommandOptions,options) {
     hostCommandOptions = JSON.stringify(hostCommandOptions)
   }
   if (hostCommandOptions && typeof(hostCommandOptions) === 'string') {
-    try {
+    try { // turn string into object
       var userHostCommandOptions = JSON.parse(hostCommandOptions.replace(/(\w+:)|(\w+ :)/g, function(s) {
         return '"' + s.substring(0, s.length-1) + '":';
       }));
@@ -53,18 +72,17 @@ async function turnStringIntoObject(hostCommandOptions,options) {
   }
   return options
 }
-module.exports.turnStringIntoObject = turnStringIntoObject;
+module.exports.mergeOptions = mergeOptions;
 
-
-async function cleanup(ankaCustomVMLabel,hostCommandOptions,ankaTemplate,lockFileLocation) {
+async function cleanup(ankaCustomVMLabel,hostCommandOptions,ankaVmTemplateName,lockFileLocation) {
   try {
     if (process.env[`${process.env['GITHUB_ACTION']}_isCreated`] === 'true') { // Prevent the delete if the VM was never created
-      await execute.nodeCommands(`anka delete --yes ${await getVMLabel(ankaCustomVMLabel)}`,await turnStringIntoObject(hostCommandOptions,{ silent: false }),execute.STD)
+      await execute.hostCommands(`anka delete --yes ${await getVMLabel(ankaCustomVMLabel)}`,await mergeOptions(hostCommandOptions,{ silent: false }),execute.STD)
       core.exportVariable(`${process.env['GITHUB_ACTION']}_isCreated`, false);
     }
-    await prepare.deleteLockFile(ankaTemplate,lockFileLocation)
+    await prepare.deleteLockFile(ankaVmTemplateName,lockFileLocation)
   } catch (error) {
-    throw new Error(`Cleanup failed:\n${error.stack}`); 
+    throw new Error(`cleanup failed:\n${error.stack}`); 
   }
 }
 module.exports.cleanup = cleanup;

@@ -999,10 +999,11 @@ module.exports = require("tls");
 
 const exec = __webpack_require__(986); // EXEC IS NOT A BASH INTERPRETER: https://github.com/actions/toolkit/issues/461
 const helpers = __webpack_require__(315)
+const fs = __webpack_require__(747);
 
 let STD = ''
 
-async function nodeCommands(commands,hostCommandOptions,existingSTD) {
+async function hostCommands(commands,hostCommandOptions,existingSTD) {
   if (typeof(existingSTD) !== "undefined") { // Reset 
     if (existingSTD.length !== 0) {
       STD = existingSTD
@@ -1010,7 +1011,7 @@ async function nodeCommands(commands,hostCommandOptions,existingSTD) {
   } else {
     STD = ''
   }
-  var options = await helpers.turnStringIntoObject(hostCommandOptions,{
+  var options = await helpers.mergeOptions(hostCommandOptions,{
     listeners: { // Populate STDOUT AND STDERR
       stdout: (data) => {
         STD += data.toString();
@@ -1025,29 +1026,54 @@ async function nodeCommands(commands,hostCommandOptions,existingSTD) {
     try {
       await exec.exec('bash', ['-c', `cd -P ${options.cwd} || exit 10`],{silent: true});
     } catch(error) {
-      throw new Error(`cannot find ${options.cwd}`)
+      throw new Error(`exec.exec failed: cannot find ${options.cwd}`)
     }
   }
   // Execute
   try {
     await exec.exec('bash', ['-c', commands], options);
   } catch(error) {
-    throw new Error(`nodeCommands exec.exec\n${error.stack}`)
+    throw new Error(`exec.exec failed:\n${helpers.lastFourLines(STD)}\n${error.stack}`)
   }
   // Return STD outputs
   exports.STD = STD;
   exports.finalHostCommandOptions = options; // used in tests
+  return true
 }
-module.exports.nodeCommands = nodeCommands;
+module.exports.hostCommands = hostCommands;
 
-async function ankaRun(ankaVMLabel,ankaRunOptions,ankaCommands,hostCommandOptions) {
-  if (typeof(ankaRunOptions) === "undefined" || ankaRunOptions.length === 0) {
-    ankaRunOptions = "--wait-network --wait-time"
-  }
+async function ankaRun(ankaVMLabel,ankaRunOptions,ankaVmCommands,hostCommandOptions) {
   // So we can use bash -s + HEREDOC, we need to add proper newlines to commands
-  await nodeCommands(`anka run ${ankaRunOptions} ${ankaVMLabel} bash -c \"${ankaCommands}\"`,hostCommandOptions,STD)
+  await hostCommands(`anka run ${ankaRunOptions} ${ankaVMLabel} bash -c \"${ankaVmCommands}\"`,hostCommandOptions,STD)
 }
 module.exports.ankaRun = ankaRun;
+
+async function ankaCp(direction,location,ankaVmTemplateName,destinationDirectory,hostCommandOptions) {
+  try {
+    if (direction === "in") {
+      if (fs.existsSync(location)) {
+        if (fs.lstatSync(location).isSymbolicLink()) {
+          await hostCommands(`anka cp -fRH ${location}/ ${ankaVmTemplateName}:${destinationDirectory}${helpers.obtainLastPathSection(`${location}`)}`,hostCommandOptions,STD)
+        } else if (
+          (fs.lstatSync(location).isDirectory()) ||
+          (fs.lstatSync(location).isFile())
+        ) {
+          await hostCommands(`anka cp -fa ${location} ${ankaVmTemplateName}:${destinationDirectory}`,hostCommandOptions,STD)
+        } else {
+          throw new Error(`could not determine if "${location}" is a file, folder, symlink`)
+        }
+      } else {
+        throw new Error(`"${location}" does not exist`)
+      }
+    } else { // out
+      await hostCommands(`anka cp -fa ${ankaVmTemplateName}:${location} ${destinationDirectory}`,hostCommandOptions,STD)
+    }
+  } catch (error) {
+    throw new Error(`ankaCp failed:\n${error.stack}`); 
+  }
+  return true
+}
+module.exports.ankaCp = ankaCp;
 
 /***/ }),
 
@@ -2111,55 +2137,104 @@ const execute = __webpack_require__(23);
 // Envs accessible to post/cleanup
 const hostCommandOptions = core.getInput('host-command-options');
 const ankaCustomVMLabel = core.getInput('anka-custom-vm-label');
-const ankaTemplate = core.getInput('anka-template');
+const ankaVmTemplateName = core.getInput('anka-vm-template-name');
 const lockFileLocation = core.getInput('lock-file-location');
 
 async function run() {
   try {
-    const ankaTag = core.getInput('anka-tag');
+    const ankaVmTagName = core.getInput('anka-vm-tag-name');
     const ankaVMLabel = await helpers.getVMLabel(ankaCustomVMLabel)
 
-    const ankaCommands = core.getInput('commands');
+    const ankaVmCommands = core.getInput('vm-commands');
     const hostPreCommands = core.getInput('host-pre-commands');
     const hostPostCommands = core.getInput('host-post-commands');
 
     const ankaStartOptions = core.getInput('anka-start-options');
-    const ankaRunOptions = core.getInput('anka-run-options');
+    var ankaRunOptions = core.getInput('anka-run-options');
+    if (typeof(ankaRunOptions) === "undefined" || ankaRunOptions.length === 0) {
+      ankaRunOptions = "--wait-network --wait-time"
+    }
     const ankaRegistryPullOptions = core.getInput('anka-registry-pull-options');
-
-    const filesToArtifact = core.getInput('artifact-files');
+    
+    var ankaCpDisabled = false
+    var ankaCpDisabledInput = core.getInput('anka-cp-disable');
+    try { // Ensure anka cp is disabled if the command doesn't exist
+      await execute.hostCommands(`anka cp --help &>/dev/null`,await helpers.mergeOptions(hostCommandOptions,{silent: true}),execute.STD)
+      if (ankaCpDisabledInput) {
+        ankaCpDisabled = true
+      }
+    } catch (error) {
+      console.log(`NOTICE: anka cp command not found (Anka versions <= 2.2.3); using legacy mount method`);
+      ankaCpDisabled = true
+    }
+    if (!ankaCpDisabled) {
+      ankaRunOptions = ankaRunOptions + " --no-volume"
+    }
+    const ankaCpHostPaths = core.getInput('anka-cp-host-paths');
+    var ankaCpDestinationDirectory = './'
+    var ankaCpDestinationDirectoryInput = core.getInput('anka-cp-destination-directory');
+    if (ankaCpDestinationDirectoryInput) {
+      if (ankaCpDestinationDirectoryInput.slice(-1) != "/") {
+        throw new Error (`anka-cp-destination-directory must end in a /`)
+      }
+      ankaCpDestinationDirectory = ankaCpDestinationDirectoryInput
+    }
+    
+    var artifactHostPaths = core.getInput('artifact-files');
+    if (artifactHostPaths) {
+      artifactHostPaths = artifactHostPaths.split("\n")
+    }
     const artifactArchiveFileName = core.getInput('artifact-archive-file-name');
-    const artifactRootDirectory = core.getInput('artifacts-root-directory');
+    var artifactsDirectoryOnHost = './'
+    var artifactsDirectoryOnHostInput = core.getInput('artifacts-directory-on-host');
+    if (artifactsDirectoryOnHostInput) {
+      if (artifactsDirectoryOnHostInput.slice(-1) != "/") {
+        throw new Error (`artifacts-directory-on-host must end in a /`)
+      }
+      artifactsDirectoryOnHost = artifactsDirectoryOnHostInput
+    }
 
     const skipRegistryPull = core.getInput('skip-registry-pull');
 
     const ankaVirtCLIPath = await io.which('anka', true)
+
     console.log(`Anka Virtualization CLI found at: ${ankaVirtCLIPath}`);
-    if (ankaTemplate.length === 0) {
-      throw new Error('anka-template is required in your workflow definition!'); 
+    if (ankaVmTemplateName.length === 0) {
+      throw new Error('anka-vm-template-name is required in your workflow definition!'); 
     }
     // Execution =========
     if (hostPreCommands) {
-      await execute.nodeCommands(hostPreCommands,hostCommandOptions,execute.STD)
+      await execute.hostCommands(hostPreCommands,hostCommandOptions,execute.STD)
     }
     /// Prepare VM
     //// Pull from Registry
-    await prepare.ankaRegistryPull(ankaTemplate,ankaTag,ankaRegistryPullOptions,hostCommandOptions,lockFileLocation,skipRegistryPull);
-    //// Clone from template
-    await prepare.ankaClone(ankaTemplate,ankaVMLabel,hostCommandOptions,lockFileLocation);
-    //// Start the VM
-    await prepare.ankaStart(ankaVMLabel,ankaStartOptions,hostCommandOptions);
-    /// Run commands inside VM
-    await execute.ankaRun(ankaVMLabel,ankaRunOptions,ankaCommands,hostCommandOptions);
-    if (hostPostCommands) {
-      await execute.nodeCommands(hostPostCommands,hostCommandOptions,execute.STD);
-    }
-    if (filesToArtifact) { // No artifacts, no problem!
-      await prepare.uploadArtifacts(artifactArchiveFileName,filesToArtifact,artifactRootDirectory,hostCommandOptions)
-    }
+    await prepare.ankaRegistryPull(ankaVmTemplateName,ankaVmTagName,ankaRegistryPullOptions,hostCommandOptions,lockFileLocation,skipRegistryPull);
+    /// Don't start the VM if the user didn't provide any commands
+    if (ankaVmCommands !== "" && typeof(ankaVmCommands) !== "undefined") {
+      //// Clone from template
+      await prepare.ankaClone(ankaVmTemplateName,ankaVMLabel,hostCommandOptions,lockFileLocation);
+      //// Start the VM
+      await prepare.ankaStart(ankaVMLabel,ankaStartOptions,hostCommandOptions);
+      //// Copy in user specified paths
+      if (!ankaCpDisabled) {
+        await prepare.ankaCpIn(ankaVMLabel,ankaCpHostPaths,ankaCpDestinationDirectory,ankaRunOptions,hostCommandOptions);
+      }
+      /// Run commands inside VM
+      await execute.ankaRun(ankaVMLabel,ankaRunOptions,ankaVmCommands,hostCommandOptions);
+      if (hostPostCommands) {
+        await execute.hostCommands(hostPostCommands,hostCommandOptions,execute.STD);
+      }
+      if (artifactHostPaths) { // No artifacts, no problem!
+        // Copy out the files for archiving
+        if (!ankaCpDisabled) {
+          await prepare.ankaCpOut(ankaVMLabel,artifactHostPaths,artifactsDirectoryOnHost,hostCommandOptions);
+        }
+        await prepare.uploadArtifacts(artifactArchiveFileName,artifactHostPaths,artifactsDirectoryOnHost,hostCommandOptions)
+      }
+    } // 
     core.setOutput('std', execute.STD);
     /// Cleanup
-    helpers.cleanup(ankaCustomVMLabel,hostCommandOptions,ankaTemplate,lockFileLocation)
+    helpers.cleanup(ankaCustomVMLabel,hostCommandOptions,ankaVmTemplateName,lockFileLocation)
   } catch (error) {
     core.setFailed(`${error.stack}`);
   }
@@ -2167,7 +2242,7 @@ async function run() {
 
 // We use GITHUB_ACTION in the ENV to prevent other steps from using isPost when they didn't really fail.
 if (process.env[`${process.env['GITHUB_ACTION']}_isPost`] === 'true') {
-  helpers.cleanup(ankaCustomVMLabel,hostCommandOptions,ankaTemplate,lockFileLocation)
+  helpers.cleanup(ankaCustomVMLabel,hostCommandOptions,ankaVmTemplateName,lockFileLocation)
 } else {
   core.exportVariable(`${process.env['GITHUB_ACTION']}_isPost`, true);
   run()
@@ -4477,6 +4552,25 @@ const core = __webpack_require__(470);
 const execute = __webpack_require__(23);
 const prepare = __webpack_require__(497);
 
+function obtainLastPathSection(path) {
+  var pathArray = path.split("/");
+  var lastIndex = pathArray.length - 1;
+  return pathArray[lastIndex];
+};
+module.exports.obtainLastPathSection = obtainLastPathSection;
+
+function lastFourLines(multiLineString) {
+  var multiLineStringArr = multiLineString.split("\n")
+  for(var cnt=0;cnt<multiLineStringArr.length;cnt++){ // indent
+    if (`${multiLineStringArr[cnt].trim()}` !== "") {
+      multiLineStringArr[cnt] = `STDOUT: ${multiLineStringArr[cnt]}`
+    }
+  }
+  var lastFourLines = multiLineStringArr.slice(multiLineStringArr.length - 4)
+  return `${lastFourLines.join("\n").trim()}`
+}
+module.exports.lastFourLines = lastFourLines;
+
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -4506,7 +4600,7 @@ async function getArtifactArchiveName(artifactArchiveFileName) {
 }
 module.exports.getArtifactArchiveName = getArtifactArchiveName;
 
-async function turnStringIntoObject(hostCommandOptions,options) {
+async function mergeOptions(hostCommandOptions,options) {
   if (options === undefined) {
     var options = {}
   }
@@ -4515,7 +4609,7 @@ async function turnStringIntoObject(hostCommandOptions,options) {
     hostCommandOptions = JSON.stringify(hostCommandOptions)
   }
   if (hostCommandOptions && typeof(hostCommandOptions) === 'string') {
-    try {
+    try { // turn string into object
       var userHostCommandOptions = JSON.parse(hostCommandOptions.replace(/(\w+:)|(\w+ :)/g, function(s) {
         return '"' + s.substring(0, s.length-1) + '":';
       }));
@@ -4528,22 +4622,20 @@ async function turnStringIntoObject(hostCommandOptions,options) {
   }
   return options
 }
-module.exports.turnStringIntoObject = turnStringIntoObject;
+module.exports.mergeOptions = mergeOptions;
 
-
-async function cleanup(ankaCustomVMLabel,hostCommandOptions,ankaTemplate,lockFileLocation) {
+async function cleanup(ankaCustomVMLabel,hostCommandOptions,ankaVmTemplateName,lockFileLocation) {
   try {
     if (process.env[`${process.env['GITHUB_ACTION']}_isCreated`] === 'true') { // Prevent the delete if the VM was never created
-      await execute.nodeCommands(`anka delete --yes ${await getVMLabel(ankaCustomVMLabel)}`,await turnStringIntoObject(hostCommandOptions,{ silent: false }),execute.STD)
+      await execute.hostCommands(`anka delete --yes ${await getVMLabel(ankaCustomVMLabel)}`,await mergeOptions(hostCommandOptions,{ silent: false }),execute.STD)
       core.exportVariable(`${process.env['GITHUB_ACTION']}_isCreated`, false);
     }
-    await prepare.deleteLockFile(ankaTemplate,lockFileLocation)
+    await prepare.deleteLockFile(ankaVmTemplateName,lockFileLocation)
   } catch (error) {
-    throw new Error(`Cleanup failed:\n${error.stack}`); 
+    throw new Error(`cleanup failed:\n${error.stack}`); 
   }
 }
 module.exports.cleanup = cleanup;
-
 
 /***/ }),
 
@@ -4724,7 +4816,7 @@ exports.getUploadFileConcurrency = getUploadFileConcurrency;
 // When uploading large files that can't be uploaded with a single http call, this controls
 // the chunk size that is used during upload
 function getUploadChunkSize() {
-    return 4 * 1024 * 1024; // 4 MB Chunks
+    return 8 * 1024 * 1024; // 8 MB Chunks
 }
 exports.getUploadChunkSize = getUploadChunkSize;
 // The maximum number of retries that can be attempted before an upload or download fails
@@ -5693,11 +5785,12 @@ const utils_1 = __webpack_require__(870);
  * Used for managing http clients during either upload or download
  */
 class HttpManager {
-    constructor(clientCount) {
+    constructor(clientCount, userAgent) {
         if (clientCount < 1) {
             throw new Error('There must be at least one client');
         }
-        this.clients = new Array(clientCount).fill(utils_1.createHttpClient());
+        this.userAgent = userAgent;
+        this.clients = new Array(clientCount).fill(utils_1.createHttpClient(userAgent));
     }
     getClient(index) {
         return this.clients[index];
@@ -5706,7 +5799,7 @@ class HttpManager {
     // for more information see: https://github.com/actions/http-client/blob/04e5ad73cd3fd1f5610a32116b0759eddf6570d2/index.ts#L292
     disposeAndReplaceClient(index) {
         this.clients[index].dispose();
-        this.clients[index] = utils_1.createHttpClient();
+        this.clients[index] = utils_1.createHttpClient(this.userAgent);
     }
     disposeAndReplaceAllClients() {
         for (const [index] of this.clients.entries()) {
@@ -5976,32 +6069,32 @@ const fs = __webpack_require__(747);
 
 let lockFileDefault = "/tmp"
 
-async function createLockFile(ankaTemplate,lockFileLocation,hostCommandOptions) {
+async function createLockFile(ankaVmTemplateName,lockFileLocation,hostCommandOptions) {
   if (lockFileLocation.length === 0) {
     lockFileLocation = lockFileDefault
   }
   if (lockFileLocation && (typeof(lockFileLocation) !== 'string' || lockFileLocation[0] !== '/')) {
-    throw new Error(`Must provide an absolute path (directory) where the lock file will be created, as a string`);
+    throw new Error(`must provide an absolute path (directory) where the lock file will be created, as a string`);
   }
-  var lockFileFull = `${lockFileLocation}/registry-pull-lock-${ankaTemplate}`
+  var lockFileFull = `${lockFileLocation}/registry-pull-lock-${ankaVmTemplateName}`
   while (fs.existsSync(lockFileFull)) { /// Check if lock file exists and prevent running until it's gone
-    await execute.nodeCommands(`echo \"Lock file ${lockFileFull} found... Another job on this node is pulling a tag for ${ankaTemplate} and pulling a second will potentially cause corruption. Sleeping for 20 seconds...\"`,hostCommandOptions,execute.STD)
+    await execute.hostCommands(`echo \"Lock file ${lockFileFull} found... Another job on this node is pulling a tag for ${ankaVmTemplateName} and pulling a second will potentially cause corruption. Sleeping for 20 seconds...\"`,hostCommandOptions,execute.STD)
     await helpers.sleep(20000);
   }
   try {
     fs.closeSync(fs.openSync(`${lockFileFull}`, 'w'));
     core.exportVariable(`${process.env['GITHUB_ACTION']}_isLocked`, true); // Prevent failures from cleaning up the lock file when it was never created by this run
   } catch (error) {
-    throw new Error(`Unable to create ${lockFileFull}\n${error.stack}`)
+    throw new Error(`unable to create ${lockFileFull}\n${error.stack}`)
   }
 }
 module.exports.createLockFile = createLockFile;
 
-async function deleteLockFile(ankaTemplate,lockFileLocation) {
+async function deleteLockFile(ankaVmTemplateName,lockFileLocation) {
   if (typeof(lockFileLocation) === "undefined" || lockFileLocation.length === 0) {
     lockFileLocation = lockFileDefault
   }
-  var lockFileFull = `${lockFileLocation}/registry-pull-lock-${ankaTemplate}`
+  var lockFileFull = `${lockFileLocation}/registry-pull-lock-${ankaVmTemplateName}`
   if (process.env[`${process.env['GITHUB_ACTION']}_isLocked`] === 'true') { // Prevent failures from cleaning up the lock file when it was never created by this run
     if (fs.existsSync(lockFileFull)) {
       try {
@@ -6009,70 +6102,115 @@ async function deleteLockFile(ankaTemplate,lockFileLocation) {
         console.log(`Deleted ${lockFileFull}!`)
         core.exportVariable(`${process.env['GITHUB_ACTION']}_isLocked`, false);
       } catch (error) {
-        throw new Error(`Unable to delete ${lockFileFull}\n${error.stack}`)
+        throw new Error(`unable to delete ${lockFileFull}\n${error.stack}`)
       }
     }
   }
 }
 module.exports.deleteLockFile = deleteLockFile;
 
-async function ankaRegistryPull(ankaTemplate,ankaTag,ankaRegistryPullOptions,hostCommandOptions,lockFileLocation,skipRegistryPull) {
+async function ankaRegistryPull(ankaVmTemplateName,ankaVmTagName,ankaRegistryPullOptions,hostCommandOptions,lockFileLocation,skipRegistryPull) {
   if (typeof(skipRegistryPull) === "undefined") {
     skipRegistryPull = false
   }
   if (skipRegistryPull !== "true") {
     try {
-      await createLockFile(ankaTemplate,lockFileLocation,hostCommandOptions)
-      var ankaTagOption = ""
-      if (ankaTag.length > 0) { 
-        ankaTagOption = `-t ${ankaTag}`
-        console.log(`Preparing Anka VM (Template: ${ankaTemplate}, Tag: ${ankaTag})`);
+      await createLockFile(ankaVmTemplateName,lockFileLocation,hostCommandOptions)
+      var ankaVmTagNameOption = ""
+      if (ankaVmTagName.length > 0) { 
+        ankaVmTagNameOption = `-t ${ankaVmTagName}`
+        console.log(`Preparing Anka VM (Template: ${ankaVmTemplateName}, Tag: ${ankaVmTagName})`);
       } else {
-        console.log(`Preparing Anka VM (Template: ${ankaTemplate}, Tag: latest)`);
+        console.log(`Preparing Anka VM (Template: ${ankaVmTemplateName}, Tag: latest)`);
       }
-      await execute.nodeCommands(`anka registry pull ${ankaRegistryPullOptions} ${ankaTemplate} ${ankaTagOption}`,hostCommandOptions,execute.STD)
+      await execute.hostCommands(`anka registry pull ${ankaRegistryPullOptions} ${ankaVmTemplateName} ${ankaVmTagNameOption}`,hostCommandOptions,execute.STD)
     } catch(error) {
-      deleteLockFile(ankaTemplate,lockFileLocation) // make sure to clean up the lock
-      throw new Error(`Registry pull failed!\n${error.stack}`)
+      deleteLockFile(ankaVmTemplateName,lockFileLocation) // make sure to clean up the lock
+      throw new Error(`registry pull failed:\n${error.stack}`)
     }
   }
 }
 module.exports.ankaRegistryPull = ankaRegistryPull;
 
-async function ankaClone(ankaTemplate,ankaVMLabel,hostCommandOptions,lockFileLocation) {
+async function ankaClone(ankaVmTemplateName,ankaVMLabel,hostCommandOptions,lockFileLocation) {
   try {
-    await execute.nodeCommands(`anka clone ${ankaTemplate} ${ankaVMLabel}`,hostCommandOptions,execute.STD)
+    await execute.hostCommands(`anka clone ${ankaVmTemplateName} ${ankaVMLabel}`,hostCommandOptions,execute.STD)
     core.exportVariable(`${process.env['GITHUB_ACTION']}_isCreated`, true);
-    await deleteLockFile(ankaTemplate,lockFileLocation) // make sure to clean up the lock
-    await execute.nodeCommands(`anka list`,hostCommandOptions,execute.STD)
+    await deleteLockFile(ankaVmTemplateName,lockFileLocation) // make sure to clean up the lock
+    await execute.hostCommands(`anka list`,hostCommandOptions,execute.STD)
   } catch(error) {
-    deleteLockFile(ankaTemplate,lockFileLocation) // make sure to clean up the lock
-    throw new Error(`Clone failed!\n${error.stack}`)
+    deleteLockFile(ankaVmTemplateName,lockFileLocation) // make sure to clean up the lock
+    throw new Error(`clone failed:\n${error.stack}`)
   }
 }
 module.exports.ankaClone = ankaClone;
 
 async function ankaStart(ankaVMLabel,ankaStartOptions,hostCommandOptions) {
-  await execute.nodeCommands(`anka start ${ankaStartOptions} ${ankaVMLabel}`,hostCommandOptions,execute.STD)
+  await execute.hostCommands(`anka start ${ankaStartOptions} ${ankaVMLabel}`,hostCommandOptions,execute.STD)
 }
 module.exports.ankaStart = ankaStart;
 
-async function uploadArtifacts(artifactArchiveFileName,filesToArtifact,artifactRootDirectory,hostCommandOptions) {
-  if (typeof(artifactRootDirectory) === "undefined" || artifactRootDirectory.length === 0) {
-    artifactRootDirectory = './'
-  }
-  if (filesToArtifact) {
+async function ankaCpIn(ankaVmTemplateName,ankaCpHostPaths,ankaCpDestinationDirectory,ankaRunOptions,hostCommandOptions) {
+  if (ankaCpHostPaths) {
     try {
+      // Bring each path (file or folder) into the VM
+      ankaCpHostPaths = ankaCpHostPaths.split("\n")
+      await execute.ankaRun(ankaVmTemplateName,ankaRunOptions,`mkdir -p ${ankaCpDestinationDirectory}`,hostCommandOptions) // ensure destination directory exists on VM
+      var pathsCount;
+      for (pathsCount = 0; pathsCount < ankaCpHostPaths.length; pathsCount++) {
+        await execute.ankaCp("in",ankaCpHostPaths[pathsCount],ankaVmTemplateName,ankaCpDestinationDirectory,hostCommandOptions)
+      }
+    } catch (error) {
+      throw new Error(`prepare.AnkaCpIn failed:\n${error.stack}`);
+    }
+  } else { // If anka cp exists and user doesn't specify anything, just upload everything from CWD
+    await execute.ankaCp("in","./",ankaVmTemplateName,ankaCpDestinationDirectory,hostCommandOptions)
+  }
+  return true
+}
+module.exports.ankaCpIn = ankaCpIn;
+
+async function ankaCpOut(ankaVmTemplateName,artifactHostPaths,artifactsDirectoryOnHost,hostCommandOptions) {
+  try {
+    var filesCount;
+    for (filesCount = 0; filesCount < artifactHostPaths.length; filesCount++) {
+      await execute.ankaCp("out",artifactHostPaths[filesCount],ankaVmTemplateName,artifactsDirectoryOnHost,hostCommandOptions)
+    }
+  } catch (error) {
+    throw new Error(`prepare.AnkaCpOut failed:\n${error.stack}`); 
+  }
+  return true
+}
+module.exports.ankaCpOut = ankaCpOut;
+
+async function uploadArtifacts(artifactArchiveFileName,artifactHostPaths,artifactsDirectoryOnHost,hostCommandOptions) {
+  if (artifactHostPaths) {
+    try {
+      // Upload the artifacts
       artifactArchiveFileName = await helpers.getArtifactArchiveName(artifactArchiveFileName)
+      // Sanitize paths so we can archive and upload them
+      var artifactHostFiles = [];
+      var filesCount;
+      for (filesCount = 0; filesCount < artifactHostPaths.length; filesCount++) {
+        var file = helpers.obtainLastPathSection(artifactHostPaths[filesCount])
+        if (fs.existsSync(file)) {
+          if (fs.lstatSync(file).isDirectory()) {
+            throw new Error(`unable to archive directories; archive either on the VM or the host before upload`)
+          }
+        } else {
+          throw new Error(`cannot find ${file} on host in ${artifactsDirectoryOnHost}`)
+        }
+        artifactHostFiles.push(file)
+      }
       var artifactResult = await artifactClient.uploadArtifact(
         artifactArchiveFileName,
-        filesToArtifact.split("\n"),
-        artifactRootDirectory,
+        artifactHostFiles,
+        artifactsDirectoryOnHost,
         { continueOnError: false }
       )
-      await execute.nodeCommands(`echo \"Created and uploaded artifact ${artifactResult.artifactName} (${artifactResult.size} bytes)\nArchive contents: ${artifactResult.artifactItems}\"`,await helpers.turnStringIntoObject(hostCommandOptions,{ silent: true }),execute.STD)
+      await execute.hostCommands(`echo \"Created and uploaded artifact ${artifactResult.artifactName} (${artifactResult.size} bytes)\nArchive contents: ${artifactResult.artifactItems}\"`,hostCommandOptions,execute.STD)
     } catch (error) {
-      throw new Error(`Failed artifact upload!\n${error.stack}`)
+      throw new Error(`failed artifact upload!\n${error.stack}`)
     }
   }
 }
@@ -6154,7 +6292,6 @@ exports.getDownloadSpecification = getDownloadSpecification;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-const url = __webpack_require__(835);
 const http = __webpack_require__(605);
 const https = __webpack_require__(211);
 const pm = __webpack_require__(950);
@@ -6203,7 +6340,7 @@ var MediaTypes;
  * @param serverUrl  The server URL where the request will be sent. For example, https://api.github.com
  */
 function getProxyUrl(serverUrl) {
-    let proxyUrl = pm.getProxyUrl(url.parse(serverUrl));
+    let proxyUrl = pm.getProxyUrl(new URL(serverUrl));
     return proxyUrl ? proxyUrl.href : '';
 }
 exports.getProxyUrl = getProxyUrl;
@@ -6222,6 +6359,15 @@ const HttpResponseRetryCodes = [
 const RetryableHttpVerbs = ['OPTIONS', 'GET', 'DELETE', 'HEAD'];
 const ExponentialBackoffCeiling = 10;
 const ExponentialBackoffTimeSlice = 5;
+class HttpClientError extends Error {
+    constructor(message, statusCode) {
+        super(message);
+        this.name = 'HttpClientError';
+        this.statusCode = statusCode;
+        Object.setPrototypeOf(this, HttpClientError.prototype);
+    }
+}
+exports.HttpClientError = HttpClientError;
 class HttpClientResponse {
     constructor(message) {
         this.message = message;
@@ -6240,7 +6386,7 @@ class HttpClientResponse {
 }
 exports.HttpClientResponse = HttpClientResponse;
 function isHttps(requestUrl) {
-    let parsedUrl = url.parse(requestUrl);
+    let parsedUrl = new URL(requestUrl);
     return parsedUrl.protocol === 'https:';
 }
 exports.isHttps = isHttps;
@@ -6345,7 +6491,7 @@ class HttpClient {
         if (this._disposed) {
             throw new Error('Client has already been disposed.');
         }
-        let parsedUrl = url.parse(requestUrl);
+        let parsedUrl = new URL(requestUrl);
         let info = this._prepareRequest(verb, parsedUrl, headers);
         // Only perform retries on reads since writes may not be idempotent.
         let maxTries = this._allowRetries && RetryableHttpVerbs.indexOf(verb) != -1
@@ -6384,7 +6530,7 @@ class HttpClient {
                     // if there's no location to redirect to, we won't
                     break;
                 }
-                let parsedRedirectUrl = url.parse(redirectUrl);
+                let parsedRedirectUrl = new URL(redirectUrl);
                 if (parsedUrl.protocol == 'https:' &&
                     parsedUrl.protocol != parsedRedirectUrl.protocol &&
                     !this._allowRedirectDowngrade) {
@@ -6500,7 +6646,7 @@ class HttpClient {
      * @param serverUrl  The server URL where the request will be sent. For example, https://api.github.com
      */
     getAgent(serverUrl) {
-        let parsedUrl = url.parse(serverUrl);
+        let parsedUrl = new URL(serverUrl);
         return this._getAgent(parsedUrl);
     }
     _prepareRequest(method, requestUrl, headers) {
@@ -6573,7 +6719,7 @@ class HttpClient {
                 maxSockets: maxSockets,
                 keepAlive: this._keepAlive,
                 proxy: {
-                    proxyAuth: proxyUrl.auth,
+                    proxyAuth: `${proxyUrl.username}:${proxyUrl.password}`,
                     host: proxyUrl.hostname,
                     port: proxyUrl.port
                 }
@@ -6668,12 +6814,8 @@ class HttpClient {
                 else {
                     msg = 'Failed request: (' + statusCode + ')';
                 }
-                let err = new Error(msg);
-                // attach statusCode and body obj (if available) to the error object
-                err['statusCode'] = statusCode;
-                if (response.result) {
-                    err['result'] = response.result;
-                }
+                let err = new HttpClientError(msg, statusCode);
+                err.result = response.result;
                 reject(err);
             }
             else {
@@ -7239,7 +7381,7 @@ const upload_gzip_1 = __webpack_require__(647);
 const stat = util_1.promisify(fs.stat);
 class UploadHttpClient {
     constructor() {
-        this.uploadHttpManager = new http_manager_1.HttpManager(config_variables_1.getUploadFileConcurrency());
+        this.uploadHttpManager = new http_manager_1.HttpManager(config_variables_1.getUploadFileConcurrency(), '@actions/artifact-upload');
         this.statusReporter = new status_reporter_1.StatusReporter(10000);
     }
     /**
@@ -8147,7 +8289,7 @@ const http_manager_1 = __webpack_require__(452);
 const config_variables_1 = __webpack_require__(401);
 class DownloadHttpClient {
     constructor() {
-        this.downloadHttpManager = new http_manager_1.HttpManager(config_variables_1.getDownloadFileConcurrency());
+        this.downloadHttpManager = new http_manager_1.HttpManager(config_variables_1.getDownloadFileConcurrency(), '@actions/artifact-download');
         // downloads are usually significantly faster than uploads so display status information every second
         this.statusReporter = new status_reporter_1.StatusReporter(1000);
     }
@@ -8677,7 +8819,8 @@ function isRetryableStatusCode(statusCode) {
         http_client_1.HttpCodes.BadGateway,
         http_client_1.HttpCodes.ServiceUnavailable,
         http_client_1.HttpCodes.GatewayTimeout,
-        http_client_1.HttpCodes.TooManyRequests
+        http_client_1.HttpCodes.TooManyRequests,
+        413 // Payload Too Large
     ];
     return retryableStatusCodes.includes(statusCode);
 }
@@ -8782,8 +8925,8 @@ function getUploadHeaders(contentType, isKeepAlive, isGzip, uncompressedLength, 
     return requestOptions;
 }
 exports.getUploadHeaders = getUploadHeaders;
-function createHttpClient() {
-    return new http_client_1.HttpClient('actions/artifact', [
+function createHttpClient(userAgent) {
+    return new http_client_1.HttpClient(userAgent, [
         new auth_1.BearerCredentialHandler(config_variables_1.getRuntimeToken())
     ]);
 }
@@ -8951,12 +9094,11 @@ var isArray = Array.isArray || function (xs) {
 /***/ }),
 
 /***/ 950:
-/***/ (function(__unusedmodule, exports, __webpack_require__) {
+/***/ (function(__unusedmodule, exports) {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-const url = __webpack_require__(835);
 function getProxyUrl(reqUrl) {
     let usingSsl = reqUrl.protocol === 'https:';
     let proxyUrl;
@@ -8971,7 +9113,7 @@ function getProxyUrl(reqUrl) {
         proxyVar = process.env['http_proxy'] || process.env['HTTP_PROXY'];
     }
     if (proxyVar) {
-        proxyUrl = url.parse(proxyVar);
+        proxyUrl = new URL(proxyVar);
     }
     return proxyUrl;
 }
