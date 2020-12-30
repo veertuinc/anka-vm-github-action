@@ -76,9 +76,9 @@ module.exports.mergeOptions = mergeOptions;
 
 async function cleanup(ankaCustomVMLabel,hostCommandOptions,ankaVmTemplateName,lockFileLocation) {
   try {
-    if (process.env[`${process.env['GITHUB_ACTION']}_isCreated`] === 'true') { // Prevent the delete if the VM was never created
+    if (process.env[`${process.env['GITHUB_ACTION']}_cloneCreated`] === 'true') { // Prevent the delete if the VM was never created
       await execute.hostCommands(`anka delete --yes ${await getVMLabel(ankaCustomVMLabel)}`,await mergeOptions(hostCommandOptions,{ silent: false }),execute.STD)
-      core.exportVariable(`${process.env['GITHUB_ACTION']}_isCreated`, false);
+      core.exportVariable(`${process.env['GITHUB_ACTION']}_cloneCreated`, false);
     }
     await prepare.deleteLockFile(ankaVmTemplateName,lockFileLocation)
   } catch (error) {
