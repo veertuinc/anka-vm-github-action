@@ -30,10 +30,10 @@ describe('prepare functions', () => {
   describe('deleteLockFile', () => {
     afterEach(() => {
       try{ fs.unlinkSync('/tmp/registry-pull-lock-10.15.6'); } catch(error) {}
-      core.exportVariable(`${process.env['GITHUB_ACTION']}_isLocked`, false)
+      core.exportVariable(`${process.env['GITHUB_ACTION']}_hasPullLockFile`, false)
     });
     test('file exists', async() => {
-      core.exportVariable(`${process.env['GITHUB_ACTION']}_isLocked`, true)
+      core.exportVariable(`${process.env['GITHUB_ACTION']}_hasPullLockFile`, true)
       fs.closeSync(fs.openSync('/tmp/registry-pull-lock-10.15.6', 'w'));
       await prepare.deleteLockFile("10.15.6")
       await expect(fs.existsSync("/tmp/registry-pull-lock-10.15.6")).toBe(false)

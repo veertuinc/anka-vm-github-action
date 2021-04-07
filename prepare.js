@@ -21,7 +21,8 @@ async function createLockFile(ankaVmTemplateName,lockFileLocation,hostCommandOpt
   }
   try {
     fs.closeSync(fs.openSync(`${lockFileFull}`, 'w'));
-    core.exportVariable(`${process.env['GITHUB_ACTION']}_isLocked`, true); // Prevent failures from cleaning up the lock file when it was never created by this run
+    console.log(`Created ${lockFileFull}!`)
+    core.exportVariable(`${process.env['GITHUB_ACTION']}_hasPullLockFile`, true); // Prevent failures from cleaning up the lock file when it was never created by this run
   } catch (error) {
     throw new Error(`unable to create ${lockFileFull}\n${error.stack}`)
   }
@@ -33,12 +34,12 @@ async function deleteLockFile(ankaVmTemplateName,lockFileLocation) {
     lockFileLocation = lockFileDefault
   }
   var lockFileFull = `${lockFileLocation}/registry-pull-lock-${ankaVmTemplateName}`
-  if (process.env[`${process.env['GITHUB_ACTION']}_isLocked`] === 'true') { // Prevent failures from cleaning up the lock file when it was never created by this run
+  if (process.env[`${process.env['GITHUB_ACTION']}_hasPullLockFile`] === 'true') { // Prevent failures from cleaning up the lock file when it was never created by this run
     if (fs.existsSync(lockFileFull)) {
       try {
         fs.unlinkSync(`${lockFileFull}`)
         console.log(`Deleted ${lockFileFull}!`)
-        core.exportVariable(`${process.env['GITHUB_ACTION']}_isLocked`, false);
+        core.exportVariable(`${process.env['GITHUB_ACTION']}_hasPullLockFile`, false);
       } catch (error) {
         throw new Error(`unable to delete ${lockFileFull}\n${error.stack}`)
       }
@@ -73,7 +74,7 @@ module.exports.ankaRegistryPull = ankaRegistryPull;
 async function ankaClone(ankaVmTemplateName,ankaVMLabel,hostCommandOptions,lockFileLocation) {
   try {
     await execute.hostCommands(`anka clone ${ankaVmTemplateName} ${ankaVMLabel}`,hostCommandOptions,execute.STD)
-    core.exportVariable(`${process.env['GITHUB_ACTION']}_isCreated`, true);
+    core.exportVariable(`${process.env['GITHUB_ACTION']}_cloneCreated`, true);
     await deleteLockFile(ankaVmTemplateName,lockFileLocation) // make sure to clean up the lock
     await execute.hostCommands(`anka list`,hostCommandOptions,execute.STD)
   } catch(error) {

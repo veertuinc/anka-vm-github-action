@@ -110,10 +110,10 @@ async function run() {
   }
 }
 
-// We use GITHUB_ACTION in the ENV to prevent other steps from using isPost when they didn't really fail.
-if (process.env[`${process.env['GITHUB_ACTION']}_isPost`] === 'true') {
+// We use GITHUB_ACTION in the ENV to prevent other steps from using readyForCleanup when they didn't really fail.
+if (process.env[`${process.env['GITHUB_ACTION']}_readyForCleanup`] === 'true') {
   helpers.cleanup(ankaCustomVMLabel,hostCommandOptions,ankaVmTemplateName,lockFileLocation)
 } else {
-  core.exportVariable(`${process.env['GITHUB_ACTION']}_isPost`, true);
+  core.exportVariable(`${process.env['GITHUB_ACTION']}_readyForCleanup`, true);
   run()
 }
