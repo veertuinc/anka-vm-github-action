@@ -1,4 +1,6 @@
 # Using the Anka VM GitHub Action
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fveertuinc%2Fanka-vm-github-action.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fveertuinc%2Fanka-vm-github-action?ref=badge_shield)
+
 
 1. Install the [Anka Build Virtualization Software](https://github.com/veertuinc/getting-started#initial-setup) onto a macOS host machine. 
     - You'll also need an [Anka Template and Tag](https://ankadocs.veertu.com/docs/getting-started/creating-your-first-vm/#anka-build-license--cloud-understanding-vm-templates-tags-and-disk-usage) (you can use our [getting started repo's create-template script](https://github.com/veertuinc/getting-started#create-vm-templatebash))
@@ -46,6 +48,9 @@ Using the above yaml, the Anka GitHub Action will:
     > If you don't specify anything, `./` will always be uploaded
 5. Execute the `vm-commands` inside of the VM (using `anka run`), ensuring Environment Variables (secrets, or anything else your CI/CD builds/tests need) on the host are passed in with `anka-run-options: "--env"`
 6. Pull the `artifact-files` out of the VM using `anka cp` and then upload an artifact/archive with both `./log.txt` and `./build/binaryfile-v1` inside
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fveertuinc%2Fanka-vm-github-action.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fveertuinc%2Fanka-vm-github-action?ref=badge_large)
 
 ## Transferring Host files into the VM
 
