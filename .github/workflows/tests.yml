@@ -16,7 +16,7 @@ jobs:
         id: normal-command-failure
         uses: ./
         with:
-          anka-vm-template-name: "11.2.3"
+          anka-vm-template-name: "11.4"
           anka-vm-tag-name: "vanilla"
           anka-run-options: "-n"
           vm-commands: "java -version || if [ \\$? -gt 0 ]; then echo failed; else exit 20; fi"
@@ -24,7 +24,7 @@ jobs:
         id: multi-line-commands-failure
         uses: ./
         with:
-          anka-vm-template-name: "11.2.3"
+          anka-vm-template-name: "11.4"
           anka-vm-tag-name: "vanilla"
           anka-run-options: "-n"
           vm-commands: |
@@ -40,7 +40,7 @@ jobs:
         uses: ./
         with:
           anka-registry-pull-options: "-s" # Needed to remove other cached tags and cause openjdk pull to take a while so we can test the Lock file
-          anka-vm-template-name: "11.2.3"
+          anka-vm-template-name: "11.4"
           anka-vm-tag-name: "vanilla"
           anka-run-options: "-n"
 
@@ -62,8 +62,8 @@ jobs:
         id: pull-test-prep-2
         uses: ./
         with:
-          host-pre-commands: "env; anka delete --yes 11.2.3 || true; anka delete --yes 11.2.3-openjdk-1.8.0_242 || true"
-          anka-vm-template-name: "11.2.3"
+          host-pre-commands: "env; anka delete --yes 11.4 || true; anka delete --yes 11.4-openjdk-1.8.0_242 || true"
+          anka-vm-template-name: "11.4"
           anka-vm-tag-name: "vanilla"
           vm-commands: ""
 
@@ -84,7 +84,7 @@ jobs:
         id: basic
         uses: ./
         with:
-          anka-vm-template-name: "11.2.3"
+          anka-vm-template-name: "11.4"
           anka-vm-tag-name: "vanilla+port-forward-22+brew-git"
           host-post-commands: "env"
           vm-commands: |
@@ -122,7 +122,7 @@ jobs:
         id: chained-redirect
         uses: ./
         with:
-          anka-vm-template-name: "11.2.3"
+          anka-vm-template-name: "11.4"
           vm-commands: "hostname && echo \"test1\" && echo \"Test2\" > /tmp/test && cat /tmp/test"
 
       - name: Check for output (testing anything execute.test.js doesn't)
@@ -139,7 +139,7 @@ jobs:
         uses: ./
         with:
           anka-run-options: "--wait-network --wait-time"
-          anka-vm-template-name: "11.2.3"
+          anka-vm-template-name: "11.4"
           anka-vm-tag-name: "vanilla"
           vm-commands: "hostname && ./test.bash 1 2 3 4"
           anka-cp-host-paths: |
@@ -150,7 +150,7 @@ jobs:
           SCRIPT_AND_ARGS_ANKA_CP_STD='${{ steps.script-and-args-anka-cp.outputs.std }}'
           printf "\n=======================\nscript-and-args-anka-cp stdout\n========================\n$SCRIPT_AND_ARGS_ANKA_CP_STD"
           [[ ! -z "$(echo \\"$SCRIPT_AND_ARGS_ANKA_CP_STD\\" | head -n 1)" ]] || exit 32
-          [[ ! -z "$(echo \\"$SCRIPT_AND_ARGS_ANKA_CP_STD\\" | grep '| 11.2.3 (vanilla)')" ]] || exit 33
+          [[ ! -z "$(echo \\"$SCRIPT_AND_ARGS_ANKA_CP_STD\\" | grep '| 11.4 (vanilla)')" ]] || exit 33
 
           true
 
@@ -159,7 +159,7 @@ jobs:
         id: inputs-testing
         uses: ./
         with:
-          anka-vm-template-name: "11.2.3"
+          anka-vm-template-name: "11.4"
           anka-vm-tag-name: "DOESNOTEXIST"
           skip-registry-pull: true
           anka-custom-vm-label: "custom-label-${GITHUB_RUN_NUMBER}"
@@ -204,7 +204,7 @@ jobs:
         id: anka-cp-1
         uses: ./
         with:
-          anka-vm-template-name: "11.2.3"
+          anka-vm-template-name: "11.4"
           anka-vm-tag-name: vanilla
           anka-custom-vm-label: "custom-label-${GITHUB_RUN_NUMBER}"
           vm-commands: |
@@ -239,7 +239,7 @@ jobs:
         id: anka-cp-custom-destination
         uses: ./
         with:
-          anka-vm-template-name: "11.2.3"
+          anka-vm-template-name: "11.4"
           anka-vm-tag-name: vanilla
           vm-commands: |
             ls -alht ./test123/
@@ -274,7 +274,7 @@ jobs:
         id: artifacts-anka-cp-1
         uses: ./
         with:
-          anka-vm-template-name: "11.2.3"
+          anka-vm-template-name: "11.4"
           anka-vm-tag-name: vanilla
           anka-custom-vm-label: "custom-label-${GITHUB_RUN_NUMBER}"
           vm-commands: |
@@ -317,7 +317,7 @@ jobs:
         id: pull-test-2
         uses: ./
         with:
-          anka-vm-template-name: "11.2.3"
+          anka-vm-template-name: "11.4"
           anka-vm-tag-name: "vanilla+port-forward-22"
           vm-commands: |
             env
@@ -332,6 +332,6 @@ jobs:
           PULL_TEST_STD='${{ steps.pull-test-2.outputs.std }}'
           printf "\n=======================\npull test std\n========================\n${{ steps.pull-test-2.outputs.std }}"
           [[ ! -z "$(echo \\"$PULL_TEST_STD\\" | head -n 1)" ]] || exit 100
-          [[ ! -z "$(echo \\"$PULL_TEST_STD\\" | grep 'Lock file /tmp/registry-pull-lock-11.2.3 found')" ]] || exit 101
+          [[ ! -z "$(echo \\"$PULL_TEST_STD\\" | grep 'Lock file /tmp/registry-pull-lock-11.4 found')" ]] || exit 101
           
           true
