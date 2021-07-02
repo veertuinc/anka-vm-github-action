@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: build
         id: build
-        uses: veertuinc/anka-vm-github-action@v1.3.1
+        uses: veertuinc/anka-vm-github-action@v1.3.2
         with:
           anka-vm-template-name: "11.2.3"
           anka-vm-tag-name: "vanilla+port-forward-22+brew-git"
@@ -152,7 +152,7 @@ jobs:
         run: "sleep 20"
       - name: pull test 2
         id: pull-test-2
-        uses: veertuinc/anka-vm-github-action@v1.3.1
+        uses: veertuinc/anka-vm-github-action@v1.3.2
         with:
           anka-vm-template-name: "11.2.3"
           anka-vm-tag-name: "base:port-forward-22"
