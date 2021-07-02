@@ -73,9 +73,9 @@ jobs:
           printf "\n=======================\npull-test-prep-2 std\n========================\n$PULL_TEST_PREP_TWO_STD"
           [[ ! -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\" | head -n 1)" ]] || exit 1
           [[ -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep '/Users/anka')" ]] || exit 2
-          [[ ! -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'self1_readyForCleanup=true')" ]] || exit 3
-          [[ -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'self1_cloneCreated')" ]] || exit 4
-          [[ -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'self1_hasPullLockFile')" ]] || exit 5
+          [[ ! -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'pull-test-prep-2_readyForCleanup=true')" ]] || exit 3
+          [[ -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'pull-test-prep-2_cloneCreated')" ]] || exit 4
+          [[ -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'pull-test-prep-2_hasPullLockFile')" ]] || exit 5
 
           true
 
@@ -108,9 +108,9 @@ jobs:
           printf "\n=======================\nbasic std\n========================\n$BASIC_STD"
           [[ ! -z "$(echo \\"$BASIC_STD\\" | head -n 1)" ]] || exit 10
           [[ ! -z "$(echo \\"$BASIC_STD\\" | grep '(vanilla+port-forward-22+brew-git)')" ]] || exit 11
-          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep 'self2_readyForCleanup=true')" ]] || exit 12
-          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep 'self2_cloneCreated=true')" ]] || exit 13
-          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep 'self2_hasPullLockFile=false')" ]] || exit 14
+          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep 'basic_readyForCleanup=true')" ]] || exit 12
+          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep 'basic_cloneCreated=true')" ]] || exit 13
+          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep 'basic_hasPullLockFile=false')" ]] || exit 14
           [[ ! -z "$(echo \\"$BASIC_STD\\" | grep '^$(echo /Users/anka)')" ]] || exit 15
           [[ ! -z "$(echo \\"$BASIC_STD\\" | grep '^$(echo $HOME)')" ]] || exit 16
           [[ ! -z "$(echo \\"$BASIC_STD\\" | grep '^$(echo /Users/' | grep -v anka)" ]] || exit 17
@@ -193,9 +193,9 @@ jobs:
           [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep '| custom-label-')" ]] || exit 43
           [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'CWD:.*anka-vm-github-action/testFolder')" ]] || exit 44
           [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'PWD=/Users/anka/testFolder')" ]] || exit 45
-          [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'self5_readyForCleanup=true')" ]] || exit 46
-          [[ -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'self5_cloneCreated')" ]] || exit 47
-          [[ -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'self5_hasPullLockFile')" ]] || exit 48
+          [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'inputs-testing_readyForCleanup=true')" ]] || exit 46
+          [[ -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'inputs-testing_cloneCreated')" ]] || exit 47
+          [[ -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'inputs-testing_hasPullLockFile')" ]] || exit 48
 
           true
 
@@ -300,9 +300,9 @@ jobs:
           [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | head -n 1)" ]] || exit 60
           [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | grep -E 'Created and uploaded artifact test-artifact-anka-cp \([0-9]+ bytes\)')" ]] || exit 61
           [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | grep 'Archive contents:.*/test1.*/test2.*/test3')" ]] || exit 63
-          [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | grep 'self8_readyForCleanup=true')" ]] || exit 64
-          [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | grep 'self8_cloneCreated=true')" ]] || exit 65
-          [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | grep 'self8_hasPullLockFile=false')" ]] || exit 66
+          [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | grep 'artifacts-anka-cp-1_readyForCleanup=true')" ]] || exit 64
+          [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | grep 'artifacts-anka-cp-1_cloneCreated=true')" ]] || exit 65
+          [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | grep 'artifacts-anka-cp-1_hasPullLockFile=false')" ]] || exit 66
 
           true
 
@@ -312,7 +312,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: sleep
-        run: "sleep 40"
+        run: "sleep 20"
       - name: pull test 2
         id: pull-test-2
         uses: ./
