@@ -16,7 +16,7 @@ jobs:
         id: normal-command-failure
         uses: ./
         with:
-          anka-vm-template-name: "11.2.3"
+          anka-vm-template-name: "11.4"
           anka-vm-tag-name: "vanilla"
           anka-run-options: "-n"
           vm-commands: "java -version || if [ \\$? -gt 0 ]; then echo failed; else exit 20; fi"
@@ -24,7 +24,7 @@ jobs:
         id: multi-line-commands-failure
         uses: ./
         with:
-          anka-vm-template-name: "11.2.3"
+          anka-vm-template-name: "11.4"
           anka-vm-tag-name: "vanilla"
           anka-run-options: "-n"
           vm-commands: |
@@ -40,7 +40,7 @@ jobs:
         uses: ./
         with:
           anka-registry-pull-options: "-s" # Needed to remove other cached tags and cause openjdk pull to take a while so we can test the Lock file
-          anka-vm-template-name: "11.2.3"
+          anka-vm-template-name: "11.4"
           anka-vm-tag-name: "vanilla"
           anka-run-options: "-n"
 
@@ -62,8 +62,8 @@ jobs:
         id: pull-test-prep-2
         uses: ./
         with:
-          host-pre-commands: "env; anka delete --yes 11.2.3 || true; anka delete --yes 11.2.3-openjdk-1.8.0_242 || true"
-          anka-vm-template-name: "11.2.3"
+          host-pre-commands: "env; anka delete --yes 11.4 || true; anka delete --yes 11.4-openjdk-1.8.0_292 || true"
+          anka-vm-template-name: "11.4"
           anka-vm-tag-name: "vanilla"
           vm-commands: ""
 
@@ -73,9 +73,9 @@ jobs:
           printf "\n=======================\npull-test-prep-2 std\n========================\n$PULL_TEST_PREP_TWO_STD"
           [[ ! -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\" | head -n 1)" ]] || exit 1
           [[ -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep '/Users/anka')" ]] || exit 2
-          [[ ! -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'self1_readyForCleanup=true')" ]] || exit 3
-          [[ -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'self1_cloneCreated')" ]] || exit 4
-          [[ -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'self1_hasPullLockFile')" ]] || exit 5
+          [[ ! -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'pull-test-prep-2_readyForCleanup=true')" ]] || exit 3
+          [[ -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'pull-test-prep-2_cloneCreated')" ]] || exit 4
+          [[ -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'pull-test-prep-2_hasPullLockFile')" ]] || exit 5
 
           true
 
@@ -84,7 +84,7 @@ jobs:
         id: basic
         uses: ./
         with:
-          anka-vm-template-name: "11.2.3"
+          anka-vm-template-name: "11.4"
           anka-vm-tag-name: "vanilla+port-forward-22+brew-git"
           host-post-commands: "env"
           vm-commands: |
@@ -108,9 +108,9 @@ jobs:
           printf "\n=======================\nbasic std\n========================\n$BASIC_STD"
           [[ ! -z "$(echo \\"$BASIC_STD\\" | head -n 1)" ]] || exit 10
           [[ ! -z "$(echo \\"$BASIC_STD\\" | grep '(vanilla+port-forward-22+brew-git)')" ]] || exit 11
-          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep 'self2_readyForCleanup=true')" ]] || exit 12
-          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep 'self2_cloneCreated=true')" ]] || exit 13
-          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep 'self2_hasPullLockFile=false')" ]] || exit 14
+          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep 'basic_readyForCleanup=true')" ]] || exit 12
+          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep 'basic_cloneCreated=true')" ]] || exit 13
+          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep 'basic_hasPullLockFile=false')" ]] || exit 14
           [[ ! -z "$(echo \\"$BASIC_STD\\" | grep '^$(echo /Users/anka)')" ]] || exit 15
           [[ ! -z "$(echo \\"$BASIC_STD\\" | grep '^$(echo $HOME)')" ]] || exit 16
           [[ ! -z "$(echo \\"$BASIC_STD\\" | grep '^$(echo /Users/' | grep -v anka)" ]] || exit 17
@@ -122,7 +122,7 @@ jobs:
         id: chained-redirect
         uses: ./
         with:
-          anka-vm-template-name: "11.2.3"
+          anka-vm-template-name: "11.4"
           vm-commands: "hostname && echo \"test1\" && echo \"Test2\" > /tmp/test && cat /tmp/test"
 
       - name: Check for output (testing anything execute.test.js doesn't)
@@ -139,7 +139,7 @@ jobs:
         uses: ./
         with:
           anka-run-options: "--wait-network --wait-time"
-          anka-vm-template-name: "11.2.3"
+          anka-vm-template-name: "11.4"
           anka-vm-tag-name: "vanilla"
           vm-commands: "hostname && ./test.bash 1 2 3 4"
           anka-cp-host-paths: |
@@ -150,7 +150,7 @@ jobs:
           SCRIPT_AND_ARGS_ANKA_CP_STD='${{ steps.script-and-args-anka-cp.outputs.std }}'
           printf "\n=======================\nscript-and-args-anka-cp stdout\n========================\n$SCRIPT_AND_ARGS_ANKA_CP_STD"
           [[ ! -z "$(echo \\"$SCRIPT_AND_ARGS_ANKA_CP_STD\\" | head -n 1)" ]] || exit 32
-          [[ ! -z "$(echo \\"$SCRIPT_AND_ARGS_ANKA_CP_STD\\" | grep '| 11.2.3 (vanilla)')" ]] || exit 33
+          [[ ! -z "$(echo \\"$SCRIPT_AND_ARGS_ANKA_CP_STD\\" | grep '| 11.4 (vanilla)')" ]] || exit 33
 
           true
 
@@ -159,7 +159,7 @@ jobs:
         id: inputs-testing
         uses: ./
         with:
-          anka-vm-template-name: "11.2.3"
+          anka-vm-template-name: "11.4"
           anka-vm-tag-name: "DOESNOTEXIST"
           skip-registry-pull: true
           anka-custom-vm-label: "custom-label-${GITHUB_RUN_NUMBER}"
@@ -193,9 +193,9 @@ jobs:
           [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep '| custom-label-')" ]] || exit 43
           [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'CWD:.*anka-vm-github-action/testFolder')" ]] || exit 44
           [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'PWD=/Users/anka/testFolder')" ]] || exit 45
-          [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'self5_readyForCleanup=true')" ]] || exit 46
-          [[ -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'self5_cloneCreated')" ]] || exit 47
-          [[ -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'self5_hasPullLockFile')" ]] || exit 48
+          [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'inputs-testing_readyForCleanup=true')" ]] || exit 46
+          [[ -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'inputs-testing_cloneCreated')" ]] || exit 47
+          [[ -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'inputs-testing_hasPullLockFile')" ]] || exit 48
 
           true
 
@@ -204,7 +204,7 @@ jobs:
         id: anka-cp-1
         uses: ./
         with:
-          anka-vm-template-name: "11.2.3"
+          anka-vm-template-name: "11.4"
           anka-vm-tag-name: vanilla
           anka-custom-vm-label: "custom-label-${GITHUB_RUN_NUMBER}"
           vm-commands: |
@@ -239,7 +239,7 @@ jobs:
         id: anka-cp-custom-destination
         uses: ./
         with:
-          anka-vm-template-name: "11.2.3"
+          anka-vm-template-name: "11.4"
           anka-vm-tag-name: vanilla
           vm-commands: |
             ls -alht ./test123/
@@ -274,7 +274,7 @@ jobs:
         id: artifacts-anka-cp-1
         uses: ./
         with:
-          anka-vm-template-name: "11.2.3"
+          anka-vm-template-name: "11.4"
           anka-vm-tag-name: vanilla
           anka-custom-vm-label: "custom-label-${GITHUB_RUN_NUMBER}"
           vm-commands: |
@@ -300,9 +300,9 @@ jobs:
           [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | head -n 1)" ]] || exit 60
           [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | grep -E 'Created and uploaded artifact test-artifact-anka-cp \([0-9]+ bytes\)')" ]] || exit 61
           [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | grep 'Archive contents:.*/test1.*/test2.*/test3')" ]] || exit 63
-          [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | grep 'self8_readyForCleanup=true')" ]] || exit 64
-          [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | grep 'self8_cloneCreated=true')" ]] || exit 65
-          [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | grep 'self8_hasPullLockFile=false')" ]] || exit 66
+          [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | grep 'artifacts-anka-cp-1_readyForCleanup=true')" ]] || exit 64
+          [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | grep 'artifacts-anka-cp-1_cloneCreated=true')" ]] || exit 65
+          [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | grep 'artifacts-anka-cp-1_hasPullLockFile=false')" ]] || exit 66
 
           true
 
@@ -312,12 +312,12 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: sleep
-        run: "sleep 40"
+        run: "sleep 20"
       - name: pull test 2
         id: pull-test-2
         uses: ./
         with:
-          anka-vm-template-name: "11.2.3"
+          anka-vm-template-name: "11.4"
           anka-vm-tag-name: "vanilla+port-forward-22"
           vm-commands: |
             env
@@ -332,6 +332,6 @@ jobs:
           PULL_TEST_STD='${{ steps.pull-test-2.outputs.std }}'
           printf "\n=======================\npull test std\n========================\n${{ steps.pull-test-2.outputs.std }}"
           [[ ! -z "$(echo \\"$PULL_TEST_STD\\" | head -n 1)" ]] || exit 100
-          [[ ! -z "$(echo \\"$PULL_TEST_STD\\" | grep 'Lock file /tmp/registry-pull-lock-11.2.3 found')" ]] || exit 101
+          [[ ! -z "$(echo \\"$PULL_TEST_STD\\" | grep 'Lock file /tmp/registry-pull-lock-11.4 found')" ]] || exit 101
           
           true

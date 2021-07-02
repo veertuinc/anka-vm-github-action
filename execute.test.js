@@ -11,7 +11,7 @@ describe('execute functions', () => {
     });
     test('fail with bad command option', async() => {
       await expect(
-        execute.hostCommands("java --version",options)
+        execute.hostCommands("java --versio",options)
       ).rejects.toThrowError(/failed with exit code 1/)
     });
     test('fail with single quotes', async() => {

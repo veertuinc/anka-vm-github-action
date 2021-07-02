@@ -1,6 +1,6 @@
 {
   "name": "anka-vm-github-action",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "description": "A GitHub Action for running commands within Anka VMs",
   "main": "index.js",
   "scripts": {
@@ -31,11 +31,11 @@
   },
   "homepage": "https://github.com/veertuinc/anka-github-action#readme",
   "dependencies": {
-    "@actions/artifact": "^0.3.5",
-    "@actions/core": "^1.2.6",
-    "@actions/exec": "^1.0.4",
-    "@actions/io": "^1.0.2",
-    "acorn": "^8.0.4",
+    "@actions/artifact": "^0.5.1",
+    "@actions/core": "^1.2.7",
+    "@actions/exec": "^1.1.0",
+    "@actions/io": "^1.1.1",
+    "acorn": "^8.1.1",
     "yarn": "^1.22.10"
   },
   "devDependencies": {
