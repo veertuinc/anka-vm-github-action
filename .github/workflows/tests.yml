@@ -62,7 +62,7 @@ jobs:
         id: pull-test-prep-2
         uses: ./
         with:
-          host-pre-commands: "env; anka delete --yes 11.4 || true; anka delete --yes 11.4-openjdk-1.8.0_242 || true"
+          host-pre-commands: "env; anka delete --yes 11.4 || true; anka delete --yes 11.4-openjdk-1.8.0_292 || true"
           anka-vm-template-name: "11.4"
           anka-vm-tag-name: "vanilla"
           vm-commands: ""
