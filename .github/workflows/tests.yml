@@ -8,330 +8,52 @@ on:
 
 jobs:
 
-  failure-tests:
+  job1:
     runs-on: [self-hosted, macOS]
+    outputs:
+      output1: ${{ steps.step1.outputs.test }}
     steps:
-      - uses: actions/checkout@v2
-      - name: normal command failure
-        id: normal-command-failure
-        uses: ./
-        with:
-          anka-vm-template-name: "11.4"
-          anka-vm-tag-name: "vanilla"
-          anka-run-options: "-n"
-          vm-commands: "java -version || if [ \\$? -gt 0 ]; then echo failed; else exit 20; fi"
-      - name: multi-line commands failure
-        id: multi-line-commands-failure
-        uses: ./
-        with:
-          anka-vm-template-name: "11.4"
-          anka-vm-tag-name: "vanilla"
-          anka-run-options: "-n"
-          vm-commands: |
-            echo 123
-            java -version || if [ \$? -gt 0 ]; then echo failed; else exit 20; fi
-  
-  prep:
-    runs-on: [self-hosted, macOS]
+      - id: step1
+        run: echo "::set-output name=test::$(hostname)"
+
+  job2:
+    runs-on: ${{needs.job1.outputs.output1}}
+    needs: job1
     steps:
-      - uses: actions/checkout@v2
-      - name: pull test prep 1
-        id: pull-test-prep-1
-        uses: ./
-        with:
-          anka-registry-pull-options: "-s" # Needed to remove other cached tags and cause openjdk pull to take a while so we can test the Lock file
-          anka-vm-template-name: "11.4"
-          anka-vm-tag-name: "vanilla"
-          anka-run-options: "-n"
+      - run: echo ${{needs.job1.outputs.output1}} ${{needs.job1.outputs.output2}}
 
-      - name: Check for output (testing anything *.test.js doesn't)
-        run: |
-          PULL_TEST_PREP_ONE_STD='${{ steps.pull-test-prep-1.outputs.std }}'
-          printf "\n=======================\npull-test-prep-1 std\n========================\n$PULL_TEST_PREP_ONE_STD"
-          [[ ! -z "$(echo \\"$PULL_TEST_PREP_ONE_STD\\" | head -n 1)" ]] || exit 1
-          [[ -z "$(echo \\"$PULL_TEST_PREP_ONE_STD\\" | grep 'vm created successfully with uuid')" ]] || exit 2
 
-          true
+  #     - name: Check for output (testing anything *.test.js doesn't)
+  #       run: |
+  #         PULL_TEST_PREP_ONE_STD='${{ steps.pull-test-prep-1.outputs.std }}'
+  #         printf "\n=======================\npull-test-prep-1 std\n========================\n$PULL_TEST_PREP_ONE_STD"
+  #         [[ ! -z "$(echo \\"$PULL_TEST_PREP_ONE_STD\\" | head -n 1)" ]] || exit 1
+  #         [[ -z "$(echo \\"$PULL_TEST_PREP_ONE_STD\\" | grep 'vm created successfully with uuid')" ]] || exit 2
 
-  functional-tests:
-    runs-on: [self-hosted, macOS]
-    needs: [prep, failure-tests]
-    steps:
-      - uses: actions/checkout@v2
-      - name: pull test prep 2
-        id: pull-test-prep-2
-        uses: ./
-        with:
-          host-pre-commands: "env; anka delete --yes 11.4 || true; anka delete --yes 11.4-openjdk-1.8.0_292 || true"
-          anka-vm-template-name: "11.4"
-          anka-vm-tag-name: "vanilla"
-          vm-commands: ""
+  #         true
 
-      - name: Check for output (testing anything execute.test.js doesn't)
-        run: |
-          PULL_TEST_PREP_TWO_STD='${{ steps.pull-test-prep-2.outputs.std }}'
-          printf "\n=======================\npull-test-prep-2 std\n========================\n$PULL_TEST_PREP_TWO_STD"
-          [[ ! -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\" | head -n 1)" ]] || exit 1
-          [[ -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep '/Users/anka')" ]] || exit 2
-          [[ ! -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'pull-test-prep-2_readyForCleanup=true')" ]] || exit 3
-          [[ -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'pull-test-prep-2_cloneCreated')" ]] || exit 4
-          [[ -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'pull-test-prep-2_hasPullLockFile')" ]] || exit 5
+  # functional-tests:
+  #   runs-on: [self-hosted, macOS]
+  #   needs: [prep, failure-tests]
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #     - name: pull test prep 2
+  #       id: pull-test-prep-2
+  #       uses: ./
+  #       with:
+  #         host-pre-commands: "env; anka delete --yes 11.4 || true; anka delete --yes 11.4-openjdk-1.8.0_292 || true"
+  #         anka-vm-template-name: "11.4"
+  #         anka-vm-tag-name: "vanilla"
+  #         vm-commands: ""
 
-          true
+  #     - name: Check for output (testing anything execute.test.js doesn't)
+  #       run: |
+  #         PULL_TEST_PREP_TWO_STD='${{ steps.pull-test-prep-2.outputs.std }}'
+  #         printf "\n=======================\npull-test-prep-2 std\n========================\n$PULL_TEST_PREP_TWO_STD"
+  #         [[ ! -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\" | head -n 1)" ]] || exit 1
+  #         [[ -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep '/Users/anka')" ]] || exit 2
+  #         [[ ! -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'pull-test-prep-2_readyForCleanup=true')" ]] || exit 3
+  #         [[ -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'pull-test-prep-2_cloneCreated')" ]] || exit 4
+  #         [[ -z "$(echo \\"$PULL_TEST_PREP_TWO_STD\\"  | grep 'pull-test-prep-2_hasPullLockFile')" ]] || exit 5
 
-      - uses: actions/checkout@v2
-      - name: basic commands
-        id: basic
-        uses: ./
-        with:
-          anka-vm-template-name: "11.4"
-          anka-vm-tag-name: "vanilla+port-forward-22+brew-git"
-          host-post-commands: "env"
-          vm-commands: |
-            env
-            ls -laht ./
-            ls -laht ../
-            cat << EOF > /tmp/yourfilehere
-            test\"1 23\"
-            \\\$(echo $HOME)
-            \\\$(echo \$HOME)
-            \\\$(echo \\\$HOME)
-            EOF
-            cat /tmp/yourfilehere
-            pwd
-            echo \"HERE\" && \
-            echo \"THERE HERE WHERE\"
-
-      - name: Check for output (testing anything execute.test.js doesn't)
-        run: |
-          BASIC_STD='${{ steps.basic.outputs.std }}'
-          printf "\n=======================\nbasic std\n========================\n$BASIC_STD"
-          [[ ! -z "$(echo \\"$BASIC_STD\\" | head -n 1)" ]] || exit 10
-          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep '(vanilla+port-forward-22+brew-git)')" ]] || exit 11
-          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep 'basic_readyForCleanup=true')" ]] || exit 12
-          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep 'basic_cloneCreated=true')" ]] || exit 13
-          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep 'basic_hasPullLockFile=false')" ]] || exit 14
-          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep '^$(echo /Users/anka)')" ]] || exit 15
-          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep '^$(echo $HOME)')" ]] || exit 16
-          [[ ! -z "$(echo \\"$BASIC_STD\\" | grep '^$(echo /Users/' | grep -v anka)" ]] || exit 17
-      
-          true
-
-      - uses: actions/checkout@v2
-      - name: chained commands and redirection into file
-        id: chained-redirect
-        uses: ./
-        with:
-          anka-vm-template-name: "11.4"
-          vm-commands: "hostname && echo \"test1\" && echo \"Test2\" > /tmp/test && cat /tmp/test"
-
-      - name: Check for output (testing anything execute.test.js doesn't)
-        run: |      
-          CHAINED_REDIRECT_STD='${{ steps.chained-redirect.outputs.std }}'
-          printf "\n=======================\nchained-redirect stdout\n========================\n$CHAINED_REDIRECT_STD"
-          [[ ! -z "$(echo \\"$CHAINED_REDIRECT_STD\\" | head -n 1)" ]] || exit 20
-
-          true
-
-      - uses: actions/checkout@v2
-      - name: script execution with args (anka cp)
-        id: script-and-args-anka-cp
-        uses: ./
-        with:
-          anka-run-options: "--wait-network --wait-time"
-          anka-vm-template-name: "11.4"
-          anka-vm-tag-name: "vanilla"
-          vm-commands: "hostname && ./test.bash 1 2 3 4"
-          anka-cp-host-paths: |
-            ./test.bash
-
-      - name: Check for output (testing anything execute.test.js doesn't)
-        run: |
-          SCRIPT_AND_ARGS_ANKA_CP_STD='${{ steps.script-and-args-anka-cp.outputs.std }}'
-          printf "\n=======================\nscript-and-args-anka-cp stdout\n========================\n$SCRIPT_AND_ARGS_ANKA_CP_STD"
-          [[ ! -z "$(echo \\"$SCRIPT_AND_ARGS_ANKA_CP_STD\\" | head -n 1)" ]] || exit 32
-          [[ ! -z "$(echo \\"$SCRIPT_AND_ARGS_ANKA_CP_STD\\" | grep '| 11.4 (vanilla)')" ]] || exit 33
-
-          true
-
-      - uses: actions/checkout@v2
-      - name: inputs are accepted and working
-        id: inputs-testing
-        uses: ./
-        with:
-          anka-vm-template-name: "11.4"
-          anka-vm-tag-name: "DOESNOTEXIST"
-          skip-registry-pull: true
-          anka-custom-vm-label: "custom-label-${GITHUB_RUN_NUMBER}"
-          vm-commands: |
-            env
-            ls -laht ./
-            ls -laht ../
-            pwd
-            echo \"HERE\" && \
-            echo \"THERE HERE WHERE\"
-            [[ -e "../testFile" ]] || exit 2
-          host-pre-commands: "env && echo PRE COMMANDS"
-          host-post-commands: |
-            echo POST COMMANDS
-            echo \"CWD: $(pwd)\"
-          anka-start-options: "-f"
-          anka-run-options: "--workdir testFolder"
-          host-command-options: |
-            {
-              cwd: "./testFolder",
-              silent: false
-            }
-
-      - name: Check for output (testing anything execute.test.js doesn't)
-        run: |
-          INPUTS_TESTING_STD='${{ steps.inputs-testing.outputs.std }}'
-          printf "\n=======================\ninputs-testing stdout\n========================\n$INPUTS_TESTING_STD"
-          [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | head -n 1)" ]] || exit 40
-          [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'PRE COMMANDS')" ]] || exit 41
-          [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'POST COMMANDS')" ]] || exit 42
-          [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep '| custom-label-')" ]] || exit 43
-          [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'CWD:.*anka-vm-github-action/testFolder')" ]] || exit 44
-          [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'PWD=/Users/anka/testFolder')" ]] || exit 45
-          [[ ! -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'inputs-testing_readyForCleanup=true')" ]] || exit 46
-          [[ -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'inputs-testing_cloneCreated')" ]] || exit 47
-          [[ -z "$(echo \\"$INPUTS_TESTING_STD\\" | grep 'inputs-testing_hasPullLockFile')" ]] || exit 48
-
-          true
-
-      - uses: actions/checkout@v2
-      - name: anka-cp
-        id: anka-cp-1
-        uses: ./
-        with:
-          anka-vm-template-name: "11.4"
-          anka-vm-tag-name: vanilla
-          anka-custom-vm-label: "custom-label-${GITHUB_RUN_NUMBER}"
-          vm-commands: |
-            ls -alht ./
-            [[ -e ./testFile ]] || exit 2
-            ls -laht ./testFile
-            [[ -e ./testFolder ]] || exit 3
-            ls -laht ./testFolder
-            [[ -e ./testSymlink/testFolder2 ]] || exit 4
-            ls -l ./testSymlink/testFolder2
-            [[ -e ./testSymlink/testFile2 ]] || exit 5
-            ls -l ./testSymlink/testFile2
-            [[ -e index.js ]] || exit 6
-            ls -l index.js
-          host-pre-commands: "rm -rf /tmp/test* && touch /tmp/testFile && mkdir -p /tmp/testFolder && touch /tmp/testFolder/testFile2 && mkdir -p /tmp/testFolder/testFolder2 && ln -sF /tmp/testFolder /tmp/testSymlink"
-          anka-cp-host-paths: |
-            /tmp/testFile
-            /tmp/testFolder
-            /tmp/testSymlink
-            ./
-
-      - name: Check for output (testing anything execute.test.js doesn't)
-        run: |
-          ANKA_CP_ONE_STD='${{ steps.anka-cp-1.outputs.std }}'
-          printf "\n=======================\nanka-cp-1 stdout\n========================\n$ANKA_CP_ONE_STD"
-          [[ ! -z "$(echo \\"$ANKA_CP_ONE_STD\\" | head -n 1)" ]] || exit 70
-
-          true
-
-      - uses: actions/checkout@v2
-      - name: anka-cp-custom-destination
-        id: anka-cp-custom-destination
-        uses: ./
-        with:
-          anka-vm-template-name: "11.4"
-          anka-vm-tag-name: vanilla
-          vm-commands: |
-            ls -alht ./test123/
-            [[ -e ./test123/testFile ]] || exit 2
-            ls -laht ./test123/testFile
-            [[ -e ./test123/testFolder ]] || exit 3
-            ls -laht ./test123/testFolder
-            [[ -e ./test123/testSymlink/testFolder2 ]] || exit 4
-            ls -l ./test123/testSymlink/testFolder2
-            [[ -e ./test123/testSymlink/testFile2 ]] || exit 5
-            ls -l ./test123/testSymlink/testFile2
-            [[ -e ./test123/index.js ]] || exit 6
-            ls -l ./test123/index.js
-          host-pre-commands: "rm -rf /tmp/test* && touch /tmp/testFile && mkdir -p /tmp/testFolder && touch /tmp/testFolder/testFile2 && mkdir -p /tmp/testFolder/testFolder2 && ln -sF /tmp/testFolder /tmp/testSymlink"
-          anka-cp-destination-directory: "test123/"
-          anka-cp-host-paths: |
-            /tmp/testFile
-            /tmp/testFolder
-            /tmp/testSymlink
-            ./
-
-      - name: Check for output (testing anything execute.test.js doesn't)
-        run: |
-          ANKA_CP_CUSTOM_DESTINATION_STD='${{ steps.anka-cp-custom-destination.outputs.std }}'
-          printf "\n=======================\nanka-cp-custom-destination stdout\n========================\n$ANKA_CP_CUSTOM_DESTINATION_STD"
-          [[ ! -z "$(echo \\"$ANKA_CP_CUSTOM_DESTINATION_STD\\" | head -n 1)" ]] || exit 70
-
-          true
-
-      - uses: actions/checkout@v2
-      - name: artifacts-anka-cp
-        id: artifacts-anka-cp-1
-        uses: ./
-        with:
-          anka-vm-template-name: "11.4"
-          anka-vm-tag-name: vanilla
-          anka-custom-vm-label: "custom-label-${GITHUB_RUN_NUMBER}"
-          vm-commands: |
-            env
-            ls -laht ./ > ./test3
-            ls -laht ../ > /Users/anka/test2
-            pwd > test1
-            echo \"HERE\" && \
-            echo \"THERE HERE WHERE\"
-          host-post-commands: |
-            env && echo POST COMMANDS && echo "CWD: $(pwd)"
-          anka-start-options: "-f"
-          artifact-archive-file-name: "test-artifact-anka-cp"
-          artifact-files: |
-            ./test1
-            /Users/anka/test2
-            test3
-            
-      - name: Check for output (testing anything execute.test.js doesn't)
-        run: |
-          ARTIFACTS_ANKA_CP_ONE_STD='${{ steps.artifacts-anka-cp-1.outputs.std }}'
-          printf "\n=======================\nartifacts-anka-cp-1 stdout\n========================\n$ARTIFACTS_ANKA_CP_ONE_STD"
-          [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | head -n 1)" ]] || exit 60
-          [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | grep -E 'Created and uploaded artifact test-artifact-anka-cp \([0-9]+ bytes\)')" ]] || exit 61
-          [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | grep 'Archive contents:.*/test1.*/test2.*/test3')" ]] || exit 63
-          [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | grep 'artifacts-anka-cp-1_readyForCleanup=true')" ]] || exit 64
-          [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | grep 'artifacts-anka-cp-1_cloneCreated=true')" ]] || exit 65
-          [[ ! -z "$(echo \\"$ARTIFACTS_ANKA_CP_ONE_STD\\" | grep 'artifacts-anka-cp-1_hasPullLockFile=false')" ]] || exit 66
-
-          true
-
-  functional-tests-second-agent:
-    runs-on: [self-hosted, macOS]
-    needs: [prep, failure-tests]
-    steps:
-      - uses: actions/checkout@v2
-      - name: sleep
-        run: "sleep 20"
-      - name: pull test 2
-        id: pull-test-2
-        uses: ./
-        with:
-          anka-vm-template-name: "11.4"
-          anka-vm-tag-name: "vanilla+port-forward-22"
-          vm-commands: |
-            env
-            ls -laht ./
-            ls -laht ../
-            pwd
-            echo "HERE" && \
-            echo "THERE HERE WHERE"
-
-      - name: Check for output (testing anything execute.test.js doesn't)
-        run: |
-          PULL_TEST_STD='${{ steps.pull-test-2.outputs.std }}'
-          printf "\n=======================\npull test std\n========================\n${{ steps.pull-test-2.outputs.std }}"
-          [[ ! -z "$(echo \\"$PULL_TEST_STD\\" | head -n 1)" ]] || exit 100
-          [[ ! -z "$(echo \\"$PULL_TEST_STD\\" | grep 'Lock file /tmp/registry-pull-lock-11.4 found')" ]] || exit 101
-          
-          true
+  #         true
