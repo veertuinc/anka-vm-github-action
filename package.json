@@ -35,7 +35,7 @@
     "@actions/core": "^1.2.7",
     "@actions/exec": "^1.1.0",
     "@actions/io": "^1.1.1",
-    "acorn": "^8.1.1",
+    "acorn": "^8.5.0",
     "yarn": "^1.22.10"
   },
   "devDependencies": {
