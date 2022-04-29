@@ -35,8 +35,7 @@
     "@actions/core": "^1.7.0",
     "@actions/exec": "^1.1.1",
     "@actions/io": "^1.1.2",
-    "acorn": "^8.7.1",
-    "yarn": "^1.22.18"
+    "acorn": "^8.7.1"
   },
   "devDependencies": {
     "@zeit/ncc": "^0.22.3",

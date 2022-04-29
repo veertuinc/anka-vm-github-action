@@ -188,7 +188,7 @@ There are two types of tests we perform:
 1. Unit tests (testing functions)
 
     ```bash
-    yarn test
+    npm run test
     ```
 
 2. Functional testing using a workflow yaml (not in this repo)
