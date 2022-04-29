@@ -19,7 +19,13 @@ module.exports =
 /******/ 		};
 /******/
 /******/ 		// Execute the module function
-/******/ 		modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
+/******/ 		var threw = true;
+/******/ 		try {
+/******/ 			modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
+/******/ 			threw = false;
+/******/ 		} finally {
+/******/ 			if(threw) delete installedModules[moduleId];
+/******/ 		}
 /******/
 /******/ 		// Flag the module as loaded
 /******/ 		module.l = true;
@@ -48,6 +54,25 @@ module.exports =
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -57,19 +82,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.findInPath = exports.which = exports.mkdirP = exports.rmRF = exports.mv = exports.cp = void 0;
+const assert_1 = __webpack_require__(357);
 const childProcess = __importStar(__webpack_require__(129));
 const path = __importStar(__webpack_require__(622));
 const util_1 = __webpack_require__(669);
 const ioUtil = __importStar(__webpack_require__(672));
 const exec = util_1.promisify(childProcess.exec);
+const execFile = util_1.promisify(childProcess.execFile);
 /**
  * Copies a file or folder.
  * Based off of shelljs - https://github.com/shelljs/shelljs/blob/9237f66c52e5daa40458f94f9565e18e8132f5a6/src/cp.js
@@ -80,14 +101,14 @@ const exec = util_1.promisify(childProcess.exec);
  */
 function cp(source, dest, options = {}) {
     return __awaiter(this, void 0, void 0, function* () {
-        const { force, recursive } = readCopyOptions(options);
+        const { force, recursive, copySourceDirectory } = readCopyOptions(options);
         const destStat = (yield ioUtil.exists(dest)) ? yield ioUtil.stat(dest) : null;
         // Dest is an existing file, but not forcing
         if (destStat && destStat.isFile() && !force) {
             return;
         }
         // If dest is an existing directory, should copy inside.
-        const newDest = destStat && destStat.isDirectory()
+        const newDest = destStat && destStat.isDirectory() && copySourceDirectory
             ? path.join(dest, path.basename(source))
             : dest;
         if (!(yield ioUtil.exists(source))) {
@@ -152,12 +173,22 @@ function rmRF(inputPath) {
         if (ioUtil.IS_WINDOWS) {
             // Node doesn't provide a delete operation, only an unlink function. This means that if the file is being used by another
             // program (e.g. antivirus), it won't be deleted. To address this, we shell out the work to rd/del.
+            // Check for invalid characters
+            // https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file
+            if (/[*"<>|]/.test(inputPath)) {
+                throw new Error('File path must not contain `*`, `"`, `<`, `>` or `|` on Windows');
+            }
             try {
+                const cmdPath = ioUtil.getCmdPath();
                 if (yield ioUtil.isDirectory(inputPath, true)) {
-                    yield exec(`rd /s /q "${inputPath}"`);
+                    yield exec(`${cmdPath} /s /c "rd /s /q "%inputPath%""`, {
+                        env: { inputPath }
+                    });
                 }
                 else {
-                    yield exec(`del /f /a "${inputPath}"`);
+                    yield exec(`${cmdPath} /s /c "del /f /a "%inputPath%""`, {
+                        env: { inputPath }
+                    });
                 }
             }
             catch (err) {
@@ -190,7 +221,7 @@ function rmRF(inputPath) {
                 return;
             }
             if (isDir) {
-                yield exec(`rm -rf "${inputPath}"`);
+                yield execFile(`rm`, [`-rf`, `${inputPath}`]);
             }
             else {
                 yield ioUtil.unlink(inputPath);
@@ -208,7 +239,8 @@ exports.rmRF = rmRF;
  */
 function mkdirP(fsPath) {
     return __awaiter(this, void 0, void 0, function* () {
-        yield ioUtil.mkdirP(fsPath);
+        assert_1.ok(fsPath, 'a path argument must be provided');
+        yield ioUtil.mkdir(fsPath, { recursive: true });
     });
 }
 exports.mkdirP = mkdirP;
@@ -306,7 +338,10 @@ exports.findInPath = findInPath;
 function readCopyOptions(options) {
     const force = options.force == null ? true : options.force;
     const recursive = Boolean(options.recursive);
-    return { force, recursive };
+    const copySourceDirectory = options.copySourceDirectory == null
+        ? true
+        : Boolean(options.copySourceDirectory);
+    return { force, recursive, copySourceDirectory };
 }
 function cpDirRecursive(sourceDir, destDir, currentDepth, force) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -367,6 +402,25 @@ function copyFile(srcFile, destFile, force) {
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -376,20 +430,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.argStringToArray = exports.ToolRunner = void 0;
 const os = __importStar(__webpack_require__(87));
 const events = __importStar(__webpack_require__(614));
 const child = __importStar(__webpack_require__(129));
 const path = __importStar(__webpack_require__(622));
 const io = __importStar(__webpack_require__(1));
 const ioUtil = __importStar(__webpack_require__(672));
+const timers_1 = __webpack_require__(213);
 /* eslint-disable @typescript-eslint/unbound-method */
 const IS_WINDOWS = process.platform === 'win32';
 /*
@@ -459,11 +508,12 @@ class ToolRunner extends events.EventEmitter {
                 s = s.substring(n + os.EOL.length);
                 n = s.indexOf(os.EOL);
             }
-            strBuffer = s;
+            return s;
         }
         catch (err) {
             // streaming lines to console is best effort.  Don't fail a build.
             this._debug(`error processing line. Failed with error ${err}`);
+            return '';
         }
     }
     _getSpawnFileName() {
@@ -745,7 +795,7 @@ class ToolRunner extends events.EventEmitter {
             // if the tool is only a file name, then resolve it from the PATH
             // otherwise verify it exists (add extension on Windows if necessary)
             this.toolPath = yield io.which(this.toolPath, true);
-            return new Promise((resolve, reject) => {
+            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
                 this._debug(`exec tool: ${this.toolPath}`);
                 this._debug('arguments:');
                 for (const arg of this.args) {
@@ -759,9 +809,12 @@ class ToolRunner extends events.EventEmitter {
                 state.on('debug', (message) => {
                     this._debug(message);
                 });
+                if (this.options.cwd && !(yield ioUtil.exists(this.options.cwd))) {
+                    return reject(new Error(`The cwd: ${this.options.cwd} does not exist!`));
+                }
                 const fileName = this._getSpawnFileName();
                 const cp = child.spawn(fileName, this._getSpawnArgs(optionsNonNull), this._getSpawnOptions(this.options, fileName));
-                const stdbuffer = '';
+                let stdbuffer = '';
                 if (cp.stdout) {
                     cp.stdout.on('data', (data) => {
                         if (this.options.listeners && this.options.listeners.stdout) {
@@ -770,14 +823,14 @@ class ToolRunner extends events.EventEmitter {
                         if (!optionsNonNull.silent && optionsNonNull.outStream) {
                             optionsNonNull.outStream.write(data);
                         }
-                        this._processLineBuffer(data, stdbuffer, (line) => {
+                        stdbuffer = this._processLineBuffer(data, stdbuffer, (line) => {
                             if (this.options.listeners && this.options.listeners.stdline) {
                                 this.options.listeners.stdline(line);
                             }
                         });
                     });
                 }
-                const errbuffer = '';
+                let errbuffer = '';
                 if (cp.stderr) {
                     cp.stderr.on('data', (data) => {
                         state.processStderr = true;
@@ -792,7 +845,7 @@ class ToolRunner extends events.EventEmitter {
                                 : optionsNonNull.outStream;
                             s.write(data);
                         }
-                        this._processLineBuffer(data, errbuffer, (line) => {
+                        errbuffer = this._processLineBuffer(data, errbuffer, (line) => {
                             if (this.options.listeners && this.options.listeners.errline) {
                                 this.options.listeners.errline(line);
                             }
@@ -839,7 +892,7 @@ class ToolRunner extends events.EventEmitter {
                     }
                     cp.stdin.end(this.options.input);
                 }
-            });
+            }));
         });
     }
 }
@@ -925,7 +978,7 @@ class ExecState extends events.EventEmitter {
             this._setResult();
         }
         else if (this.processExited) {
-            this.timeout = setTimeout(ExecState.HandleTimeout, this.delay, this);
+            this.timeout = timers_1.setTimeout(ExecState.HandleTimeout, this.delay, this);
         }
     }
     _debug(message) {
@@ -1156,6 +1209,7 @@ function onceStrict (fn) {
 // We use any as a valid input type
 /* eslint-disable @typescript-eslint/no-explicit-any */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.toCommandProperties = exports.toCommandValue = void 0;
 /**
  * Sanitizes an input into a string so it can be passed into issueCommand safely
  * @param input input to sanitize into a string
@@ -1170,6 +1224,26 @@ function toCommandValue(input) {
     return JSON.stringify(input);
 }
 exports.toCommandValue = toCommandValue;
+/**
+ *
+ * @param annotationProperties
+ * @returns The command properties to send with the actual annotation command
+ * See IssueCommandProperties: https://github.com/actions/runner/blob/main/src/Runner.Worker/ActionCommandManager.cs#L646
+ */
+function toCommandProperties(annotationProperties) {
+    if (!Object.keys(annotationProperties).length) {
+        return {};
+    }
+    return {
+        title: annotationProperties.title,
+        file: annotationProperties.file,
+        line: annotationProperties.startLine,
+        endLine: annotationProperties.endLine,
+        col: annotationProperties.startColumn,
+        endColumn: annotationProperties.endColumn
+    };
+}
+exports.toCommandProperties = toCommandProperties;
 //# sourceMappingURL=utils.js.map
 
 /***/ }),
@@ -1187,10 +1261,10 @@ module.exports = require("os");
 module.exports = minimatch
 minimatch.Minimatch = Minimatch
 
-var path = { sep: '/' }
-try {
-  path = __webpack_require__(622)
-} catch (er) {}
+var path = (function () { try { return __webpack_require__(622) } catch (e) {}}()) || {
+  sep: '/'
+}
+minimatch.sep = path.sep
 
 var GLOBSTAR = minimatch.GLOBSTAR = Minimatch.GLOBSTAR = {}
 var expand = __webpack_require__(306)
@@ -1242,43 +1316,64 @@ function filter (pattern, options) {
 }
 
 function ext (a, b) {
-  a = a || {}
   b = b || {}
   var t = {}
-  Object.keys(b).forEach(function (k) {
-    t[k] = b[k]
-  })
   Object.keys(a).forEach(function (k) {
     t[k] = a[k]
+  })
+  Object.keys(b).forEach(function (k) {
+    t[k] = b[k]
   })
   return t
 }
 
 minimatch.defaults = function (def) {
-  if (!def || !Object.keys(def).length) return minimatch
+  if (!def || typeof def !== 'object' || !Object.keys(def).length) {
+    return minimatch
+  }
 
   var orig = minimatch
 
   var m = function minimatch (p, pattern, options) {
-    return orig.minimatch(p, pattern, ext(def, options))
+    return orig(p, pattern, ext(def, options))
   }
 
   m.Minimatch = function Minimatch (pattern, options) {
     return new orig.Minimatch(pattern, ext(def, options))
+  }
+  m.Minimatch.defaults = function defaults (options) {
+    return orig.defaults(ext(def, options)).Minimatch
+  }
+
+  m.filter = function filter (pattern, options) {
+    return orig.filter(pattern, ext(def, options))
+  }
+
+  m.defaults = function defaults (options) {
+    return orig.defaults(ext(def, options))
+  }
+
+  m.makeRe = function makeRe (pattern, options) {
+    return orig.makeRe(pattern, ext(def, options))
+  }
+
+  m.braceExpand = function braceExpand (pattern, options) {
+    return orig.braceExpand(pattern, ext(def, options))
+  }
+
+  m.match = function (list, pattern, options) {
+    return orig.match(list, pattern, ext(def, options))
   }
 
   return m
 }
 
 Minimatch.defaults = function (def) {
-  if (!def || !Object.keys(def).length) return Minimatch
   return minimatch.defaults(def).Minimatch
 }
 
 function minimatch (p, pattern, options) {
-  if (typeof pattern !== 'string') {
-    throw new TypeError('glob pattern string required')
-  }
+  assertValidPattern(pattern)
 
   if (!options) options = {}
 
@@ -1286,9 +1381,6 @@ function minimatch (p, pattern, options) {
   if (!options.nocomment && pattern.charAt(0) === '#') {
     return false
   }
-
-  // "" only matches ""
-  if (pattern.trim() === '') return p === ''
 
   return new Minimatch(pattern, options).match(p)
 }
@@ -1298,15 +1390,14 @@ function Minimatch (pattern, options) {
     return new Minimatch(pattern, options)
   }
 
-  if (typeof pattern !== 'string') {
-    throw new TypeError('glob pattern string required')
-  }
+  assertValidPattern(pattern)
 
   if (!options) options = {}
+
   pattern = pattern.trim()
 
   // windows support: need to use /, not \
-  if (path.sep !== '/') {
+  if (!options.allowWindowsEscape && path.sep !== '/') {
     pattern = pattern.split(path.sep).join('/')
   }
 
@@ -1317,6 +1408,7 @@ function Minimatch (pattern, options) {
   this.negate = false
   this.comment = false
   this.empty = false
+  this.partial = !!options.partial
 
   // make the set of regexps etc.
   this.make()
@@ -1326,9 +1418,6 @@ Minimatch.prototype.debug = function () {}
 
 Minimatch.prototype.make = make
 function make () {
-  // don't do it more than once.
-  if (this._made) return
-
   var pattern = this.pattern
   var options = this.options
 
@@ -1348,7 +1437,7 @@ function make () {
   // step 2: expand braces
   var set = this.globSet = this.braceExpand()
 
-  if (options.debug) this.debug = console.error
+  if (options.debug) this.debug = function debug() { console.error.apply(console, arguments) }
 
   this.debug(this.pattern, set)
 
@@ -1428,17 +1517,27 @@ function braceExpand (pattern, options) {
   pattern = typeof pattern === 'undefined'
     ? this.pattern : pattern
 
-  if (typeof pattern === 'undefined') {
-    throw new TypeError('undefined pattern')
-  }
+  assertValidPattern(pattern)
 
-  if (options.nobrace ||
-    !pattern.match(/\{.*\}/)) {
+  // Thanks to Yeting Li <https://github.com/yetingli> for
+  // improving this regexp to avoid a ReDOS vulnerability.
+  if (options.nobrace || !/\{(?:(?!\{).)*\}/.test(pattern)) {
     // shortcut. no need to expand.
     return [pattern]
   }
 
   return expand(pattern)
+}
+
+var MAX_PATTERN_LENGTH = 1024 * 64
+var assertValidPattern = function (pattern) {
+  if (typeof pattern !== 'string') {
+    throw new TypeError('invalid pattern')
+  }
+
+  if (pattern.length > MAX_PATTERN_LENGTH) {
+    throw new TypeError('pattern is too long')
+  }
 }
 
 // parse a component of the expanded set.
@@ -1455,14 +1554,17 @@ function braceExpand (pattern, options) {
 Minimatch.prototype.parse = parse
 var SUBPARSE = {}
 function parse (pattern, isSub) {
-  if (pattern.length > 1024 * 64) {
-    throw new TypeError('pattern is too long')
-  }
+  assertValidPattern(pattern)
 
   var options = this.options
 
   // shortcuts
-  if (!options.noglobstar && pattern === '**') return GLOBSTAR
+  if (pattern === '**') {
+    if (!options.noglobstar)
+      return GLOBSTAR
+    else
+      pattern = '*'
+  }
   if (pattern === '') return ''
 
   var re = ''
@@ -1518,10 +1620,12 @@ function parse (pattern, isSub) {
     }
 
     switch (c) {
-      case '/':
+      /* istanbul ignore next */
+      case '/': {
         // completely not allowed, even escaped.
         // Should already be path-split by now.
         return false
+      }
 
       case '\\':
         clearStateChar()
@@ -1640,25 +1744,23 @@ function parse (pattern, isSub) {
 
         // handle the case where we left a class open.
         // "[z-a]" is valid, equivalent to "\[z-a\]"
-        if (inClass) {
-          // split where the last [ was, make sure we don't have
-          // an invalid re. if so, re-walk the contents of the
-          // would-be class to re-translate any characters that
-          // were passed through as-is
-          // TODO: It would probably be faster to determine this
-          // without a try/catch and a new RegExp, but it's tricky
-          // to do safely.  For now, this is safe and works.
-          var cs = pattern.substring(classStart + 1, i)
-          try {
-            RegExp('[' + cs + ']')
-          } catch (er) {
-            // not a valid class!
-            var sp = this.parse(cs, SUBPARSE)
-            re = re.substr(0, reClassStart) + '\\[' + sp[0] + '\\]'
-            hasMagic = hasMagic || sp[1]
-            inClass = false
-            continue
-          }
+        // split where the last [ was, make sure we don't have
+        // an invalid re. if so, re-walk the contents of the
+        // would-be class to re-translate any characters that
+        // were passed through as-is
+        // TODO: It would probably be faster to determine this
+        // without a try/catch and a new RegExp, but it's tricky
+        // to do safely.  For now, this is safe and works.
+        var cs = pattern.substring(classStart + 1, i)
+        try {
+          RegExp('[' + cs + ']')
+        } catch (er) {
+          // not a valid class!
+          var sp = this.parse(cs, SUBPARSE)
+          re = re.substr(0, reClassStart) + '\\[' + sp[0] + '\\]'
+          hasMagic = hasMagic || sp[1]
+          inClass = false
+          continue
         }
 
         // finish up the class.
@@ -1742,9 +1844,7 @@ function parse (pattern, isSub) {
   // something that could conceivably capture a dot
   var addPatternStart = false
   switch (re.charAt(0)) {
-    case '.':
-    case '[':
-    case '(': addPatternStart = true
+    case '[': case '.': case '(': addPatternStart = true
   }
 
   // Hack to work around lack of negative lookbehind in JS
@@ -1806,7 +1906,7 @@ function parse (pattern, isSub) {
   var flags = options.nocase ? 'i' : ''
   try {
     var regExp = new RegExp('^' + re + '$', flags)
-  } catch (er) {
+  } catch (er) /* istanbul ignore next - should be impossible */ {
     // If it was an invalid regular expression, then it can't match
     // anything.  This trick looks for a character after the end of
     // the string, which is of course impossible, except in multi-line
@@ -1864,7 +1964,7 @@ function makeRe () {
 
   try {
     this.regexp = new RegExp(re, flags)
-  } catch (ex) {
+  } catch (ex) /* istanbul ignore next - should be impossible */ {
     this.regexp = false
   }
   return this.regexp
@@ -1882,8 +1982,8 @@ minimatch.match = function (list, pattern, options) {
   return list
 }
 
-Minimatch.prototype.match = match
-function match (f, partial) {
+Minimatch.prototype.match = function match (f, partial) {
+  if (typeof partial === 'undefined') partial = this.partial
   this.debug('match', f, this.pattern)
   // short-circuit in the case of busted things.
   // comments, etc.
@@ -1965,6 +2065,7 @@ Minimatch.prototype.matchOne = function (file, pattern, partial) {
 
     // should be impossible.
     // some invalid regexp stuff in the set.
+    /* istanbul ignore if */
     if (p === false) return false
 
     if (p === GLOBSTAR) {
@@ -2038,6 +2139,7 @@ Minimatch.prototype.matchOne = function (file, pattern, partial) {
       // no match was found.
       // However, in partial mode, we can't say this is necessarily over.
       // If there's more *pattern* left, then
+      /* istanbul ignore if */
       if (partial) {
         // ran out of file
         this.debug('\n>>> no match, partial?', file, fr, pattern, pr)
@@ -2051,11 +2153,7 @@ Minimatch.prototype.matchOne = function (file, pattern, partial) {
     // patterns with magic have been turned into regexps.
     var hit
     if (typeof p === 'string') {
-      if (options.nocase) {
-        hit = f.toLowerCase() === p.toLowerCase()
-      } else {
-        hit = f === p
-      }
+      hit = f === p
       this.debug('string match', p, f, hit)
     } else {
       hit = f.match(p)
@@ -2086,16 +2184,16 @@ Minimatch.prototype.matchOne = function (file, pattern, partial) {
     // this is ok if we're doing the match as part of
     // a glob fs traversal.
     return partial
-  } else if (pi === pl) {
+  } else /* istanbul ignore else */ if (pi === pl) {
     // ran out of pattern, still have file left.
     // this is only acceptable if we're on the very last
     // empty segment of a file with a trailing slash.
     // a/* should match a/b/
-    var emptyFileEnd = (fi === fl - 1) && (file[fi] === '')
-    return emptyFileEnd
+    return (fi === fl - 1) && (file[fi] === '')
   }
 
   // should be unreachable.
+  /* istanbul ignore next */
   throw new Error('wtf?')
 }
 
@@ -2117,14 +2215,27 @@ function regExpEscape (s) {
 "use strict";
 
 // For internal use, subject to change.
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.issueCommand = void 0;
 // We use any as a valid input type
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const fs = __importStar(__webpack_require__(747));
@@ -2165,8 +2276,7 @@ const lockFileLocation = core.getInput('lock-file-location');
 async function run() {
   try {
     const ankaVmTagName = core.getInput('anka-vm-tag-name');
-    const ankaVMLabel = await helpers.getVMLabel(ankaCustomVMLabel)
-
+    const ankaVMLabel = await helpers.getVMLabel(ankaCustomVMLabel);
     const ankaVmCommands = core.getInput('vm-commands');
     const hostPreCommands = core.getInput('host-pre-commands');
     const hostPostCommands = core.getInput('host-post-commands');
@@ -2880,9 +2990,7 @@ const fs = __webpack_require__(747);
 const os = __webpack_require__(87);
 const path = __webpack_require__(622);
 const crypto = __webpack_require__(417);
-const _c = fs.constants && os.constants ?
-  { fs: fs.constants, os: os.constants } :
-  process.binding('constants');
+const _c = { fs: fs.constants, os: os.constants };
 const rimraf = __webpack_require__(569);
 
 /*
@@ -2898,127 +3006,25 @@ const
 
   CREATE_FLAGS = (_c.O_CREAT || _c.fs.O_CREAT) | (_c.O_EXCL || _c.fs.O_EXCL) | (_c.O_RDWR || _c.fs.O_RDWR),
 
+  // constants are off on the windows platform and will not match the actual errno codes
+  IS_WIN32 = os.platform() === 'win32',
   EBADF = _c.EBADF || _c.os.errno.EBADF,
   ENOENT = _c.ENOENT || _c.os.errno.ENOENT,
 
-  DIR_MODE = 448 /* 0o700 */,
-  FILE_MODE = 384 /* 0o600 */,
+  DIR_MODE = 0o700 /* 448 */,
+  FILE_MODE = 0o600 /* 384 */,
 
   EXIT = 'exit',
 
-  SIGINT = 'SIGINT',
-
   // this will hold the objects need to be removed on exit
-  _removeObjects = [];
+  _removeObjects = [],
 
-var
+  // API change in fs.rmdirSync leads to error when passing in a second parameter, e.g. the callback
+  FN_RMDIR_SYNC = fs.rmdirSync.bind(fs),
+  FN_RIMRAF_SYNC = rimraf.sync;
+
+let
   _gracefulCleanup = false;
-
-/**
- * Random name generator based on crypto.
- * Adapted from http://blog.tompawlak.org/how-to-generate-random-values-nodejs-javascript
- *
- * @param {number} howMany
- * @returns {string} the generated random name
- * @private
- */
-function _randomChars(howMany) {
-  var
-    value = [],
-    rnd = null;
-
-  // make sure that we do not fail because we ran out of entropy
-  try {
-    rnd = crypto.randomBytes(howMany);
-  } catch (e) {
-    rnd = crypto.pseudoRandomBytes(howMany);
-  }
-
-  for (var i = 0; i < howMany; i++) {
-    value.push(RANDOM_CHARS[rnd[i] % RANDOM_CHARS.length]);
-  }
-
-  return value.join('');
-}
-
-/**
- * Checks whether the `obj` parameter is defined or not.
- *
- * @param {Object} obj
- * @returns {boolean} true if the object is undefined
- * @private
- */
-function _isUndefined(obj) {
-  return typeof obj === 'undefined';
-}
-
-/**
- * Parses the function arguments.
- *
- * This function helps to have optional arguments.
- *
- * @param {(Options|Function)} options
- * @param {Function} callback
- * @returns {Array} parsed arguments
- * @private
- */
-function _parseArguments(options, callback) {
-  /* istanbul ignore else */
-  if (typeof options === 'function') {
-    return [{}, options];
-  }
-
-  /* istanbul ignore else */
-  if (_isUndefined(options)) {
-    return [{}, callback];
-  }
-
-  return [options, callback];
-}
-
-/**
- * Generates a new temporary name.
- *
- * @param {Object} opts
- * @returns {string} the new random name according to opts
- * @private
- */
-function _generateTmpName(opts) {
-
-  const tmpDir = _getTmpDir();
-
-  // fail early on missing tmp dir
-  if (isBlank(opts.dir) && isBlank(tmpDir)) {
-    throw new Error('No tmp dir specified');
-  }
-
-  /* istanbul ignore else */
-  if (!isBlank(opts.name)) {
-    return path.join(opts.dir || tmpDir, opts.name);
-  }
-
-  // mkstemps like template
-  // opts.template has already been guarded in tmpName() below
-  /* istanbul ignore else */
-  if (opts.template) {
-    var template = opts.template;
-    // make sure that we prepend the tmp path if none was given
-    /* istanbul ignore else */
-    if (path.basename(template) === template)
-      template = path.join(opts.dir || tmpDir, template);
-    return template.replace(TEMPLATE_PATTERN, _randomChars(6));
-  }
-
-  // prefix and postfix
-  const name = [
-    (isBlank(opts.prefix) ? 'tmp-' : opts.prefix),
-    process.pid,
-    _randomChars(12),
-    (opts.postfix ? opts.postfix : '')
-  ].join('');
-
-  return path.join(opts.dir || tmpDir, name);
-}
 
 /**
  * Gets a temporary file name.
@@ -3027,20 +3033,18 @@ function _generateTmpName(opts) {
  * @param {?tmpNameCallback} callback the callback function
  */
 function tmpName(options, callback) {
-  var
+  const
     args = _parseArguments(options, callback),
     opts = args[0],
-    cb = args[1],
-    tries = !isBlank(opts.name) ? 1 : opts.tries || DEFAULT_TRIES;
+    cb = args[1];
 
-  /* istanbul ignore else */
-  if (isNaN(tries) || tries < 0)
-    return cb(new Error('Invalid tries'));
+  try {
+    _assertAndSanitizeOptions(opts);
+  } catch (err) {
+    return cb(err);
+  }
 
-  /* istanbul ignore else */
-  if (opts.template && !opts.template.match(TEMPLATE_PATTERN))
-    return cb(new Error('Invalid template provided'));
-
+  let tries = opts.tries;
   (function _getUniqueName() {
     try {
       const name = _generateTmpName(opts);
@@ -3071,19 +3075,13 @@ function tmpName(options, callback) {
  * @throws {Error} if the options are invalid or could not generate a filename
  */
 function tmpNameSync(options) {
-  var
+  const
     args = _parseArguments(options),
-    opts = args[0],
-    tries = !isBlank(opts.name) ? 1 : opts.tries || DEFAULT_TRIES;
+    opts = args[0];
 
-  /* istanbul ignore else */
-  if (isNaN(tries) || tries < 0)
-    throw new Error('Invalid tries');
+  _assertAndSanitizeOptions(opts);
 
-  /* istanbul ignore else */
-  if (opts.template && !opts.template.match(TEMPLATE_PATTERN))
-    throw new Error('Invalid template provided');
-
+  let tries = opts.tries;
   do {
     const name = _generateTmpName(opts);
     try {
@@ -3099,11 +3097,11 @@ function tmpNameSync(options) {
 /**
  * Creates and opens a temporary file.
  *
- * @param {(Options|fileCallback)} options the config options or the callback function
+ * @param {(Options|null|undefined|fileCallback)} options the config options or the callback function or null or undefined
  * @param {?fileCallback} callback
  */
 function file(options, callback) {
-  var
+  const
     args = _parseArguments(options, callback),
     opts = args[0],
     cb = args[1];
@@ -3115,34 +3113,20 @@ function file(options, callback) {
 
     // create and open the file
     fs.open(name, CREATE_FLAGS, opts.mode || FILE_MODE, function _fileCreated(err, fd) {
-      /* istanbul ignore else */
+      /* istanbu ignore else */
       if (err) return cb(err);
 
       if (opts.discardDescriptor) {
-        return fs.close(fd, function _discardCallback(err) {
-          /* istanbul ignore else */
-          if (err) {
-            // Low probability, and the file exists, so this could be
-            // ignored.  If it isn't we certainly need to unlink the
-            // file, and if that fails too its error is more
-            // important.
-            try {
-              fs.unlinkSync(name);
-            } catch (e) {
-              if (!isENOENT(e)) {
-                err = e;
-              }
-            }
-            return cb(err);
-          }
-          cb(null, name, undefined, _prepareTmpFileRemoveCallback(name, -1, opts));
+        return fs.close(fd, function _discardCallback(possibleErr) {
+          // the chance of getting an error on close here is rather low and might occur in the most edgiest cases only
+          return cb(possibleErr, name, undefined, _prepareTmpFileRemoveCallback(name, -1, opts, false));
         });
+      } else {
+        // detachDescriptor passes the descriptor whereas discardDescriptor closes it, either way, we no longer care
+        // about the descriptor
+        const discardOrDetachDescriptor = opts.discardDescriptor || opts.detachDescriptor;
+        cb(null, name, fd, _prepareTmpFileRemoveCallback(name, discardOrDetachDescriptor ? -1 : fd, opts, false));
       }
-      /* istanbul ignore else */
-      if (opts.detachDescriptor) {
-        return cb(null, name, fd, _prepareTmpFileRemoveCallback(name, -1, opts));
-      }
-      cb(null, name, fd, _prepareTmpFileRemoveCallback(name, fd, opts));
     });
   });
 }
@@ -3155,7 +3139,7 @@ function file(options, callback) {
  * @throws {Error} if cannot create a file
  */
 function fileSync(options) {
-  var
+  const
     args = _parseArguments(options),
     opts = args[0];
 
@@ -3171,7 +3155,7 @@ function fileSync(options) {
   return {
     name: name,
     fd: fd,
-    removeCallback: _prepareTmpFileRemoveCallback(name, discardOrDetachDescriptor ? -1 : fd, opts)
+    removeCallback: _prepareTmpFileRemoveCallback(name, discardOrDetachDescriptor ? -1 : fd, opts, true)
   };
 }
 
@@ -3182,7 +3166,7 @@ function fileSync(options) {
  * @param {?dirCallback} callback
  */
 function dir(options, callback) {
-  var
+  const
     args = _parseArguments(options, callback),
     opts = args[0],
     cb = args[1];
@@ -3197,7 +3181,7 @@ function dir(options, callback) {
       /* istanbul ignore else */
       if (err) return cb(err);
 
-      cb(null, name, _prepareTmpDirRemoveCallback(name, opts));
+      cb(null, name, _prepareTmpDirRemoveCallback(name, opts, false));
     });
   });
 }
@@ -3210,7 +3194,7 @@ function dir(options, callback) {
  * @throws {Error} if it cannot create a directory
  */
 function dirSync(options) {
-  var
+  const
     args = _parseArguments(options),
     opts = args[0];
 
@@ -3219,7 +3203,7 @@ function dirSync(options) {
 
   return {
     name: name,
-    removeCallback: _prepareTmpDirRemoveCallback(name, opts)
+    removeCallback: _prepareTmpDirRemoveCallback(name, opts, true)
   };
 }
 
@@ -3232,15 +3216,15 @@ function dirSync(options) {
  */
 function _removeFileAsync(fdPath, next) {
   const _handler = function (err) {
-    if (err && !isENOENT(err)) {
+    if (err && !_isENOENT(err)) {
       // reraise any unanticipated error
       return next(err);
     }
     next();
-  }
+  };
 
   if (0 <= fdPath[0])
-    fs.close(fdPath[0], function (err) {
+    fs.close(fdPath[0], function () {
       fs.unlink(fdPath[1], _handler);
     });
   else fs.unlink(fdPath[1], _handler);
@@ -3253,117 +3237,104 @@ function _removeFileAsync(fdPath, next) {
  * @private
  */
 function _removeFileSync(fdPath) {
+  let rethrownException = null;
   try {
     if (0 <= fdPath[0]) fs.closeSync(fdPath[0]);
   } catch (e) {
     // reraise any unanticipated error
-    if (!isEBADF(e) && !isENOENT(e)) throw e;
+    if (!_isEBADF(e) && !_isENOENT(e)) throw e;
   } finally {
     try {
       fs.unlinkSync(fdPath[1]);
     }
     catch (e) {
       // reraise any unanticipated error
-      if (!isENOENT(e)) throw e;
+      if (!_isENOENT(e)) rethrownException = e;
     }
+  }
+  if (rethrownException !== null) {
+    throw rethrownException;
   }
 }
 
 /**
  * Prepares the callback for removal of the temporary file.
  *
+ * Returns either a sync callback or a async callback depending on whether
+ * fileSync or file was called, which is expressed by the sync parameter.
+ *
  * @param {string} name the path of the file
  * @param {number} fd file descriptor
  * @param {Object} opts
- * @returns {fileCallback}
+ * @param {boolean} sync
+ * @returns {fileCallback | fileCallbackSync}
  * @private
  */
-function _prepareTmpFileRemoveCallback(name, fd, opts) {
-  const removeCallbackSync = _prepareRemoveCallback(_removeFileSync, [fd, name]);
-  const removeCallback = _prepareRemoveCallback(_removeFileAsync, [fd, name], removeCallbackSync);
+function _prepareTmpFileRemoveCallback(name, fd, opts, sync) {
+  const removeCallbackSync = _prepareRemoveCallback(_removeFileSync, [fd, name], sync);
+  const removeCallback = _prepareRemoveCallback(_removeFileAsync, [fd, name], sync, removeCallbackSync);
 
   if (!opts.keep) _removeObjects.unshift(removeCallbackSync);
 
-  return removeCallback;
-}
-
-/**
- * Simple wrapper for rimraf.
- *
- * @param {string} dirPath
- * @param {Function} next
- * @private
- */
-function _rimrafRemoveDirWrapper(dirPath, next) {
-  rimraf(dirPath, next);
-}
-
-/**
- * Simple wrapper for rimraf.sync.
- *
- * @param {string} dirPath
- * @private
- */
-function _rimrafRemoveDirSyncWrapper(dirPath, next) {
-  try {
-    return next(null, rimraf.sync(dirPath));
-  } catch (err) {
-    return next(err);
-  }
+  return sync ? removeCallbackSync : removeCallback;
 }
 
 /**
  * Prepares the callback for removal of the temporary directory.
  *
+ * Returns either a sync callback or a async callback depending on whether
+ * tmpFileSync or tmpFile was called, which is expressed by the sync parameter.
+ *
  * @param {string} name
  * @param {Object} opts
+ * @param {boolean} sync
  * @returns {Function} the callback
  * @private
  */
-function _prepareTmpDirRemoveCallback(name, opts) {
-  const removeFunction = opts.unsafeCleanup ? _rimrafRemoveDirWrapper : fs.rmdir.bind(fs);
-  const removeFunctionSync = opts.unsafeCleanup ? _rimrafRemoveDirSyncWrapper : fs.rmdirSync.bind(fs);
-  const removeCallbackSync = _prepareRemoveCallback(removeFunctionSync, name);
-  const removeCallback = _prepareRemoveCallback(removeFunction, name, removeCallbackSync);
+function _prepareTmpDirRemoveCallback(name, opts, sync) {
+  const removeFunction = opts.unsafeCleanup ? rimraf : fs.rmdir.bind(fs);
+  const removeFunctionSync = opts.unsafeCleanup ? FN_RIMRAF_SYNC : FN_RMDIR_SYNC;
+  const removeCallbackSync = _prepareRemoveCallback(removeFunctionSync, name, sync);
+  const removeCallback = _prepareRemoveCallback(removeFunction, name, sync, removeCallbackSync);
   if (!opts.keep) _removeObjects.unshift(removeCallbackSync);
 
-  return removeCallback;
+  return sync ? removeCallbackSync : removeCallback;
 }
 
 /**
  * Creates a guarded function wrapping the removeFunction call.
  *
+ * The cleanup callback is save to be called multiple times.
+ * Subsequent invocations will be ignored.
+ *
  * @param {Function} removeFunction
- * @param {Object} arg
- * @returns {Function}
+ * @param {string} fileOrDirName
+ * @param {boolean} sync
+ * @param {cleanupCallbackSync?} cleanupCallbackSync
+ * @returns {cleanupCallback | cleanupCallbackSync}
  * @private
  */
-function _prepareRemoveCallback(removeFunction, arg, cleanupCallbackSync) {
-  var called = false;
+function _prepareRemoveCallback(removeFunction, fileOrDirName, sync, cleanupCallbackSync) {
+  let called = false;
 
+  // if sync is true, the next parameter will be ignored
   return function _cleanupCallback(next) {
-    next = next || function () {};
+
+    /* istanbul ignore else */
     if (!called) {
+      // remove cleanupCallback from cache
       const toRemove = cleanupCallbackSync || _cleanupCallback;
       const index = _removeObjects.indexOf(toRemove);
       /* istanbul ignore else */
       if (index >= 0) _removeObjects.splice(index, 1);
 
       called = true;
-      // sync?
-      if (removeFunction.length === 1) {
-        try {
-          removeFunction(arg);
-          return next(null);
-        }
-        catch (err) {
-          // if no next is provided and since we are
-          // in silent cleanup mode on process exit,
-          // we will ignore the error
-          return next(err);
-        }
-      } else return removeFunction(arg, next);
-    } else return next(new Error('cleanup callback has already been called'));
+      if (sync || removeFunction === FN_RMDIR_SYNC || removeFunction === FN_RIMRAF_SYNC) {
+        return removeFunction(fileOrDirName);
+      } else {
+        return removeFunction(fileOrDirName, next || function() {});
+      }
+    }
   };
 }
 
@@ -3388,41 +3359,30 @@ function _garbageCollector() {
 }
 
 /**
- * Helper for testing against EBADF to compensate changes made to Node 7.x under Windows.
+ * Random name generator based on crypto.
+ * Adapted from http://blog.tompawlak.org/how-to-generate-random-values-nodejs-javascript
+ *
+ * @param {number} howMany
+ * @returns {string} the generated random name
+ * @private
  */
-function isEBADF(error) {
-  return isExpectedError(error, -EBADF, 'EBADF');
-}
+function _randomChars(howMany) {
+  let
+    value = [],
+    rnd = null;
 
-/**
- * Helper for testing against ENOENT to compensate changes made to Node 7.x under Windows.
- */
-function isENOENT(error) {
-  return isExpectedError(error, -ENOENT, 'ENOENT');
-}
+  // make sure that we do not fail because we ran out of entropy
+  try {
+    rnd = crypto.randomBytes(howMany);
+  } catch (e) {
+    rnd = crypto.pseudoRandomBytes(howMany);
+  }
 
-/**
- * Helper to determine whether the expected error code matches the actual code and errno,
- * which will differ between the supported node versions.
- *
- * - Node >= 7.0:
- *   error.code {string}
- *   error.errno {string|number} any numerical value will be negated
- *
- * - Node >= 6.0 < 7.0:
- *   error.code {string}
- *   error.errno {number} negated
- *
- * - Node >= 4.0 < 6.0: introduces SystemError
- *   error.code {string}
- *   error.errno {number} negated
- *
- * - Node >= 0.10 < 4.0:
- *   error.code {number} negated
- *   error.errno n/a
- */
-function isExpectedError(error, code, errno) {
-  return error.code === code || error.code === errno;
+  for (var i = 0; i < howMany; i++) {
+    value.push(RANDOM_CHARS[rnd[i] % RANDOM_CHARS.length]);
+  }
+
+  return value.join('');
 }
 
 /**
@@ -3432,12 +3392,241 @@ function isExpectedError(error, code, errno) {
  * @param {string} s
  * @returns {Boolean} true whether the string s is blank, false otherwise
  */
-function isBlank(s) {
-  return s === null || s === undefined || !s.trim();
+function _isBlank(s) {
+  return s === null || _isUndefined(s) || !s.trim();
+}
+
+/**
+ * Checks whether the `obj` parameter is defined or not.
+ *
+ * @param {Object} obj
+ * @returns {boolean} true if the object is undefined
+ * @private
+ */
+function _isUndefined(obj) {
+  return typeof obj === 'undefined';
+}
+
+/**
+ * Parses the function arguments.
+ *
+ * This function helps to have optional arguments.
+ *
+ * @param {(Options|null|undefined|Function)} options
+ * @param {?Function} callback
+ * @returns {Array} parsed arguments
+ * @private
+ */
+function _parseArguments(options, callback) {
+  /* istanbul ignore else */
+  if (typeof options === 'function') {
+    return [{}, options];
+  }
+
+  /* istanbul ignore else */
+  if (_isUndefined(options)) {
+    return [{}, callback];
+  }
+
+  // copy options so we do not leak the changes we make internally
+  const actualOptions = {};
+  for (const key of Object.getOwnPropertyNames(options)) {
+    actualOptions[key] = options[key];
+  }
+
+  return [actualOptions, callback];
+}
+
+/**
+ * Generates a new temporary name.
+ *
+ * @param {Object} opts
+ * @returns {string} the new random name according to opts
+ * @private
+ */
+function _generateTmpName(opts) {
+
+  const tmpDir = opts.tmpdir;
+
+  /* istanbul ignore else */
+  if (!_isUndefined(opts.name))
+    return path.join(tmpDir, opts.dir, opts.name);
+
+  /* istanbul ignore else */
+  if (!_isUndefined(opts.template))
+    return path.join(tmpDir, opts.dir, opts.template).replace(TEMPLATE_PATTERN, _randomChars(6));
+
+  // prefix and postfix
+  const name = [
+    opts.prefix ? opts.prefix : 'tmp',
+    '-',
+    process.pid,
+    '-',
+    _randomChars(12),
+    opts.postfix ? '-' + opts.postfix : ''
+  ].join('');
+
+  return path.join(tmpDir, opts.dir, name);
+}
+
+/**
+ * Asserts whether the specified options are valid, also sanitizes options and provides sane defaults for missing
+ * options.
+ *
+ * @param {Options} options
+ * @private
+ */
+function _assertAndSanitizeOptions(options) {
+
+  options.tmpdir = _getTmpDir(options);
+
+  const tmpDir = options.tmpdir;
+
+  /* istanbul ignore else */
+  if (!_isUndefined(options.name))
+    _assertIsRelative(options.name, 'name', tmpDir);
+  /* istanbul ignore else */
+  if (!_isUndefined(options.dir))
+    _assertIsRelative(options.dir, 'dir', tmpDir);
+  /* istanbul ignore else */
+  if (!_isUndefined(options.template)) {
+    _assertIsRelative(options.template, 'template', tmpDir);
+    if (!options.template.match(TEMPLATE_PATTERN))
+      throw new Error(`Invalid template, found "${options.template}".`);
+  }
+  /* istanbul ignore else */
+  if (!_isUndefined(options.tries) && isNaN(options.tries) || options.tries < 0)
+    throw new Error(`Invalid tries, found "${options.tries}".`);
+
+  // if a name was specified we will try once
+  options.tries = _isUndefined(options.name) ? options.tries || DEFAULT_TRIES : 1;
+  options.keep = !!options.keep;
+  options.detachDescriptor = !!options.detachDescriptor;
+  options.discardDescriptor = !!options.discardDescriptor;
+  options.unsafeCleanup = !!options.unsafeCleanup;
+
+  // sanitize dir, also keep (multiple) blanks if the user, purportedly sane, requests us to
+  options.dir = _isUndefined(options.dir) ? '' : path.relative(tmpDir, _resolvePath(options.dir, tmpDir));
+  options.template = _isUndefined(options.template) ? undefined : path.relative(tmpDir, _resolvePath(options.template, tmpDir));
+  // sanitize further if template is relative to options.dir
+  options.template = _isBlank(options.template) ? undefined : path.relative(options.dir, options.template);
+
+  // for completeness' sake only, also keep (multiple) blanks if the user, purportedly sane, requests us to
+  options.name = _isUndefined(options.name) ? undefined : _sanitizeName(options.name);
+  options.prefix = _isUndefined(options.prefix) ? '' : options.prefix;
+  options.postfix = _isUndefined(options.postfix) ? '' : options.postfix;
+}
+
+/**
+ * Resolve the specified path name in respect to tmpDir.
+ *
+ * The specified name might include relative path components, e.g. ../
+ * so we need to resolve in order to be sure that is is located inside tmpDir
+ *
+ * @param name
+ * @param tmpDir
+ * @returns {string}
+ * @private
+ */
+function _resolvePath(name, tmpDir) {
+  const sanitizedName = _sanitizeName(name);
+  if (sanitizedName.startsWith(tmpDir)) {
+    return path.resolve(sanitizedName);
+  } else {
+    return path.resolve(path.join(tmpDir, sanitizedName));
+  }
+}
+
+/**
+ * Sanitize the specified path name by removing all quote characters.
+ *
+ * @param name
+ * @returns {string}
+ * @private
+ */
+function _sanitizeName(name) {
+  if (_isBlank(name)) {
+    return name;
+  }
+  return name.replace(/["']/g, '');
+}
+
+/**
+ * Asserts whether specified name is relative to the specified tmpDir.
+ *
+ * @param {string} name
+ * @param {string} option
+ * @param {string} tmpDir
+ * @throws {Error}
+ * @private
+ */
+function _assertIsRelative(name, option, tmpDir) {
+  if (option === 'name') {
+    // assert that name is not absolute and does not contain a path
+    if (path.isAbsolute(name))
+      throw new Error(`${option} option must not contain an absolute path, found "${name}".`);
+    // must not fail on valid .<name> or ..<name> or similar such constructs
+    let basename = path.basename(name);
+    if (basename === '..' || basename === '.' || basename !== name)
+      throw new Error(`${option} option must not contain a path, found "${name}".`);
+  }
+  else { // if (option === 'dir' || option === 'template') {
+    // assert that dir or template are relative to tmpDir
+    if (path.isAbsolute(name) && !name.startsWith(tmpDir)) {
+      throw new Error(`${option} option must be relative to "${tmpDir}", found "${name}".`);
+    }
+    let resolvedPath = _resolvePath(name, tmpDir);
+    if (!resolvedPath.startsWith(tmpDir))
+      throw new Error(`${option} option must be relative to "${tmpDir}", found "${resolvedPath}".`);
+  }
+}
+
+/**
+ * Helper for testing against EBADF to compensate changes made to Node 7.x under Windows.
+ *
+ * @private
+ */
+function _isEBADF(error) {
+  return _isExpectedError(error, -EBADF, 'EBADF');
+}
+
+/**
+ * Helper for testing against ENOENT to compensate changes made to Node 7.x under Windows.
+ *
+ * @private
+ */
+function _isENOENT(error) {
+  return _isExpectedError(error, -ENOENT, 'ENOENT');
+}
+
+/**
+ * Helper to determine whether the expected error code matches the actual code and errno,
+ * which will differ between the supported node versions.
+ *
+ * - Node >= 7.0:
+ *   error.code {string}
+ *   error.errno {number} any numerical value will be negated
+ *
+ * CAVEAT
+ *
+ * On windows, the errno for EBADF is -4083 but os.constants.errno.EBADF is different and we must assume that ENOENT
+ * is no different here.
+ *
+ * @param {SystemError} error
+ * @param {number} errno
+ * @param {string} code
+ * @private
+ */
+function _isExpectedError(error, errno, code) {
+  return IS_WIN32 ? error.code === code : error.code === code && error.errno === errno;
 }
 
 /**
  * Sets the graceful cleanup.
+ *
+ * If graceful cleanup is set, tmp will remove all controlled temporary objects on process exit, otherwise the
+ * temporary objects will remain in place, waiting to be cleaned up on system restart or otherwise scheduled temporary
+ * object removals.
  */
 function setGracefulCleanup() {
   _gracefulCleanup = true;
@@ -3447,120 +3636,38 @@ function setGracefulCleanup() {
  * Returns the currently configured tmp dir from os.tmpdir().
  *
  * @private
+ * @param {?Options} options
  * @returns {string} the currently configured tmp dir
  */
-function _getTmpDir() {
-  return os.tmpdir();
+function _getTmpDir(options) {
+  return path.resolve(_sanitizeName(options && options.tmpdir || os.tmpdir()));
 }
 
-/**
- * If there are multiple different versions of tmp in place, make sure that
- * we recognize the old listeners.
- *
- * @param {Function} listener
- * @private
- * @returns {Boolean} true whether listener is a legacy listener
- */
-function _is_legacy_listener(listener) {
-  return (listener.name === '_exit' || listener.name === '_uncaughtExceptionThrown')
-    && listener.toString().indexOf('_garbageCollector();') > -1;
-}
-
-/**
- * Safely install SIGINT listener.
- *
- * NOTE: this will only work on OSX and Linux.
- *
- * @private
- */
-function _safely_install_sigint_listener() {
-
-  const listeners = process.listeners(SIGINT);
-  const existingListeners = [];
-  for (let i = 0, length = listeners.length; i < length; i++) {
-    const lstnr = listeners[i];
-    /* istanbul ignore else */
-    if (lstnr.name === '_tmp$sigint_listener') {
-      existingListeners.push(lstnr);
-      process.removeListener(SIGINT, lstnr);
-    }
-  }
-  process.on(SIGINT, function _tmp$sigint_listener(doExit) {
-    for (let i = 0, length = existingListeners.length; i < length; i++) {
-      // let the existing listener do the garbage collection (e.g. jest sandbox)
-      try {
-        existingListeners[i](false);
-      } catch (err) {
-        // ignore
-      }
-    }
-    try {
-      // force the garbage collector even it is called again in the exit listener
-      _garbageCollector();
-    } finally {
-      if (!!doExit) {
-        process.exit(0);
-      }
-    }
-  });
-}
-
-/**
- * Safely install process exit listener.
- *
- * @private
- */
-function _safely_install_exit_listener() {
-  const listeners = process.listeners(EXIT);
-
-  // collect any existing listeners
-  const existingListeners = [];
-  for (let i = 0, length = listeners.length; i < length; i++) {
-    const lstnr = listeners[i];
-    /* istanbul ignore else */
-    // TODO: remove support for legacy listeners once release 1.0.0 is out
-    if (lstnr.name === '_tmp$safe_listener' || _is_legacy_listener(lstnr)) {
-      // we must forget about the uncaughtException listener, hopefully it is ours
-      if (lstnr.name !== '_uncaughtExceptionThrown') {
-        existingListeners.push(lstnr);
-      }
-      process.removeListener(EXIT, lstnr);
-    }
-  }
-  // TODO: what was the data parameter good for?
-  process.addListener(EXIT, function _tmp$safe_listener(data) {
-    for (let i = 0, length = existingListeners.length; i < length; i++) {
-      // let the existing listener do the garbage collection (e.g. jest sandbox)
-      try {
-        existingListeners[i](data);
-      } catch (err) {
-        // ignore
-      }
-    }
-    _garbageCollector();
-  });
-}
-
-_safely_install_exit_listener();
-_safely_install_sigint_listener();
+// Install process exit listener
+process.addListener(EXIT, _garbageCollector);
 
 /**
  * Configuration options.
  *
  * @typedef {Object} Options
+ * @property {?boolean} keep the temporary object (file or dir) will not be garbage collected
  * @property {?number} tries the number of tries before give up the name generation
+ * @property (?int) mode the access mode, defaults are 0o700 for directories and 0o600 for files
  * @property {?string} template the "mkstemp" like filename template
- * @property {?string} name fix name
- * @property {?string} dir the tmp directory to use
+ * @property {?string} name fixed name relative to tmpdir or the specified dir option
+ * @property {?string} dir tmp directory relative to the root tmp directory in use
  * @property {?string} prefix prefix for the generated name
  * @property {?string} postfix postfix for the generated name
+ * @property {?string} tmpdir the root tmp directory which overrides the os tmpdir
  * @property {?boolean} unsafeCleanup recursively removes the created temporary directory, even when it's not empty
+ * @property {?boolean} detachDescriptor detaches the file descriptor, caller is responsible for closing the file, tmp will no longer try closing the file during garbage collection
+ * @property {?boolean} discardDescriptor discards the file descriptor (closes file, fd is -1), tmp will no longer try closing the file during garbage collection
  */
 
 /**
  * @typedef {Object} FileSyncObject
  * @property {string} name the name of the file
- * @property {string} fd the file descriptor
+ * @property {string} fd the file descriptor or -1 if the fd has been discarded
  * @property {fileCallback} removeCallback the callback function to remove the file
  */
 
@@ -3580,8 +3687,16 @@ _safely_install_sigint_listener();
  * @callback fileCallback
  * @param {?Error} err the error object if anything goes wrong
  * @param {string} name the temporary file name
- * @param {number} fd the file descriptor
+ * @param {number} fd the file descriptor or -1 if the fd had been discarded
  * @param {cleanupCallback} fn the cleanup callback function
+ */
+
+/**
+ * @callback fileCallbackSync
+ * @param {?Error} err the error object if anything goes wrong
+ * @param {string} name the temporary file name
+ * @param {number} fd the file descriptor or -1 if the fd had been discarded
+ * @param {cleanupCallbackSync} fn the cleanup callback function
  */
 
 /**
@@ -3592,10 +3707,23 @@ _safely_install_sigint_listener();
  */
 
 /**
+ * @callback dirCallbackSync
+ * @param {?Error} err the error object if anything goes wrong
+ * @param {string} name the temporary file name
+ * @param {cleanupCallbackSync} fn the cleanup callback function
+ */
+
+/**
  * Removes the temporary created file or directory.
  *
  * @callback cleanupCallback
- * @param {simpleCallback} [next] function to call after entry was removed
+ * @param {simpleCallback} [next] function to call whenever the tmp object needs to be removed
+ */
+
+/**
+ * Removes the temporary created file or directory.
+ *
+ * @callback cleanupCallbackSync
  */
 
 /**
@@ -3607,7 +3735,7 @@ _safely_install_sigint_listener();
 
 // exporting all the needed methods
 
-// evaluate os.tmpdir() lazily, mainly for simplifying testing but it also will
+// evaluate _getTmpDir() lazily, mainly for simplifying testing but it also will
 // allow users to reconfigure the temporary directory
 Object.defineProperty(module.exports, 'tmpdir', {
   enumerable: true,
@@ -3637,6 +3765,7 @@ module.exports.setGracefulCleanup = setGracefulCleanup;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.StatusReporter = void 0;
 const core_1 = __webpack_require__(470);
 /**
  * Status Reporter that displays information about the progress/status of an artifact that is being uploaded or downloaded
@@ -3651,11 +3780,11 @@ class StatusReporter {
         this.processedCount = 0;
         this.largeFiles = new Map();
         this.totalFileStatus = undefined;
-        this.largeFileStatus = undefined;
         this.displayFrequencyInMilliseconds = displayFrequencyInMilliseconds;
     }
     setTotalNumberOfFilesToProcess(fileTotal) {
         this.totalNumberOfFilesToProcess = fileTotal;
+        this.processedCount = 0;
     }
     start() {
         // displays information about the total upload/download status
@@ -3664,29 +3793,16 @@ class StatusReporter {
             const percentage = this.formatPercentage(this.processedCount, this.totalNumberOfFilesToProcess);
             core_1.info(`Total file count: ${this.totalNumberOfFilesToProcess} ---- Processed file #${this.processedCount} (${percentage.slice(0, percentage.indexOf('.') + 2)}%)`);
         }, this.displayFrequencyInMilliseconds);
-        // displays extra information about any large files that take a significant amount of time to upload or download every 1 second
-        this.largeFileStatus = setInterval(() => {
-            for (const value of Array.from(this.largeFiles.values())) {
-                core_1.info(value);
-            }
-            // delete all entries in the map after displaying the information so it will not be displayed again unless explicitly added
-            this.largeFiles.clear();
-        }, 1000);
     }
     // if there is a large file that is being uploaded in chunks, this is used to display extra information about the status of the upload
-    updateLargeFileStatus(fileName, numerator, denominator) {
+    updateLargeFileStatus(fileName, chunkStartIndex, chunkEndIndex, totalUploadFileSize) {
         // display 1 decimal place without any rounding
-        const percentage = this.formatPercentage(numerator, denominator);
-        const displayInformation = `Uploading ${fileName} (${percentage.slice(0, percentage.indexOf('.') + 2)}%)`;
-        // any previously added display information should be overwritten for the specific large file because a map is being used
-        this.largeFiles.set(fileName, displayInformation);
+        const percentage = this.formatPercentage(chunkEndIndex, totalUploadFileSize);
+        core_1.info(`Uploaded ${fileName} (${percentage.slice(0, percentage.indexOf('.') + 2)}%) bytes ${chunkStartIndex}:${chunkEndIndex}`);
     }
     stop() {
         if (this.totalFileStatus) {
             clearInterval(this.totalFileStatus);
-        }
-        if (this.largeFileStatus) {
-            clearInterval(this.largeFileStatus);
         }
     }
     incrementProcessedCount() {
@@ -3709,12 +3825,20 @@ module.exports = require("https");
 
 /***/ }),
 
+/***/ 213:
+/***/ (function(module) {
+
+module.exports = require("timers");
+
+/***/ }),
+
 /***/ 214:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.create = void 0;
 const artifact_client_1 = __webpack_require__(359);
 /**
  * Constructs an ArtifactClient
@@ -3799,7 +3923,6 @@ exports.PersonalAccessTokenCredentialHandler = PersonalAccessTokenCredentialHand
 module.exports = globSync
 globSync.GlobSync = GlobSync
 
-var fs = __webpack_require__(747)
 var rp = __webpack_require__(302)
 var minimatch = __webpack_require__(93)
 var Minimatch = minimatch.Minimatch
@@ -3809,8 +3932,6 @@ var path = __webpack_require__(622)
 var assert = __webpack_require__(357)
 var isAbsolute = __webpack_require__(681)
 var common = __webpack_require__(856)
-var alphasort = common.alphasort
-var alphasorti = common.alphasorti
 var setopts = common.setopts
 var ownProp = common.ownProp
 var childrenIgnored = common.childrenIgnored
@@ -4046,7 +4167,7 @@ GlobSync.prototype._readdirInGlobStar = function (abs) {
   var lstat
   var stat
   try {
-    lstat = fs.lstatSync(abs)
+    lstat = this.fs.lstatSync(abs)
   } catch (er) {
     if (er.code === 'ENOENT') {
       // lstat failed, doesn't exist
@@ -4083,7 +4204,7 @@ GlobSync.prototype._readdir = function (abs, inGlobStar) {
   }
 
   try {
-    return this._readdirEntries(abs, fs.readdirSync(abs))
+    return this._readdirEntries(abs, this.fs.readdirSync(abs))
   } catch (er) {
     this._readdirError(abs, er)
     return null
@@ -4242,7 +4363,7 @@ GlobSync.prototype._stat = function (f) {
   if (!stat) {
     var lstat
     try {
-      lstat = fs.lstatSync(abs)
+      lstat = this.fs.lstatSync(abs)
     } catch (er) {
       if (er && (er.code === 'ENOENT' || er.code === 'ENOTDIR')) {
         this.statCache[abs] = false
@@ -4252,7 +4373,7 @@ GlobSync.prototype._stat = function (f) {
 
     if (lstat && lstat.isSymbolicLink()) {
       try {
-        stat = fs.statSync(abs)
+        stat = this.fs.statSync(abs)
       } catch (er) {
         stat = lstat
       }
@@ -4356,6 +4477,13 @@ function unmonkeypatch () {
   fs.realpathSync = origRealpathSync
 }
 
+
+/***/ }),
+
+/***/ 304:
+/***/ (function(module) {
+
+module.exports = require("string_decoder");
 
 /***/ }),
 
@@ -4673,6 +4801,25 @@ module.exports = require("assert");
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -4682,18 +4829,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.DefaultArtifactClient = void 0;
 const core = __importStar(__webpack_require__(470));
 const upload_specification_1 = __webpack_require__(590);
 const upload_http_client_1 = __webpack_require__(608);
 const utils_1 = __webpack_require__(870);
+const path_and_artifact_name_validation_1 = __webpack_require__(553);
 const download_http_client_1 = __webpack_require__(855);
 const download_specification_1 = __webpack_require__(532);
 const config_variables_1 = __webpack_require__(401);
@@ -4710,7 +4852,9 @@ class DefaultArtifactClient {
      */
     uploadArtifact(name, files, rootDirectory, options) {
         return __awaiter(this, void 0, void 0, function* () {
-            utils_1.checkArtifactName(name);
+            core.info(`Starting artifact upload
+For more detailed logs during the artifact upload process, enable step-debugging: https://docs.github.com/actions/monitoring-and-troubleshooting-workflows/enabling-debug-logging#enabling-step-debug-logging`);
+            path_and_artifact_name_validation_1.checkArtifactName(name);
             // Get specification for the files being uploaded
             const uploadSpecification = upload_specification_1.getUploadSpecification(name, rootDirectory, files);
             const uploadResponse = {
@@ -4725,18 +4869,30 @@ class DefaultArtifactClient {
             }
             else {
                 // Create an entry for the artifact in the file container
-                const response = yield uploadHttpClient.createArtifactInFileContainer(name);
+                const response = yield uploadHttpClient.createArtifactInFileContainer(name, options);
                 if (!response.fileContainerResourceUrl) {
                     core.debug(response.toString());
                     throw new Error('No URL provided by the Artifact Service to upload an artifact to');
                 }
                 core.debug(`Upload Resource URL: ${response.fileContainerResourceUrl}`);
+                core.info(`Container for artifact "${name}" successfully created. Starting upload of file(s)`);
                 // Upload each of the files that were found concurrently
                 const uploadResult = yield uploadHttpClient.uploadArtifactToFileContainer(response.fileContainerResourceUrl, uploadSpecification, options);
                 // Update the size of the artifact to indicate we are done uploading
                 // The uncompressed size is used for display when downloading a zip of the artifact from the UI
+                core.info(`File upload process has finished. Finalizing the artifact upload`);
                 yield uploadHttpClient.patchArtifactSize(uploadResult.totalSize, name);
-                core.info(`Finished uploading artifact ${name}. Reported size is ${uploadResult.uploadSize} bytes. There were ${uploadResult.failedItems.length} items that failed to upload`);
+                if (uploadResult.failedItems.length > 0) {
+                    core.info(`Upload finished. There were ${uploadResult.failedItems.length} items that failed to upload`);
+                }
+                else {
+                    core.info(`Artifact has been finalized. All files have been successfully uploaded!`);
+                }
+                core.info(`
+The raw size of all the files that were specified for upload is ${uploadResult.totalSize} bytes
+The size of all the files that were uploaded is ${uploadResult.uploadSize} bytes. This takes into account any gzip compression used to reduce the upload size, time and storage
+
+Note: The size of downloaded zips can differ significantly from the reported size. For more information see: https://github.com/actions/upload-artifact#zipped-artifact-downloads \r\n`);
                 uploadResponse.artifactItems = uploadSpecification.map(item => item.absoluteFilePath);
                 uploadResponse.size = uploadResult.uploadSize;
                 uploadResponse.failedItems = uploadResult.failedItems;
@@ -4799,6 +4955,7 @@ class DefaultArtifactClient {
             while (downloadedArtifacts < artifacts.count) {
                 const currentArtifactToDownload = artifacts.value[downloadedArtifacts];
                 downloadedArtifacts += 1;
+                core.info(`starting download of artifact ${currentArtifactToDownload.name} : ${downloadedArtifacts}/${artifacts.count}`);
                 // Get container entries for the specific artifact
                 const items = yield downloadHttpClient.getContainerItems(currentArtifactToDownload.name, currentArtifactToDownload.fileContainerResourceUrl);
                 const downloadSpecification = download_specification_1.getDownloadSpecification(currentArtifactToDownload.name, items.value, path, true);
@@ -4830,6 +4987,7 @@ exports.DefaultArtifactClient = DefaultArtifactClient;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getRetentionDays = exports.getWorkSpaceDirectory = exports.getWorkFlowRunId = exports.getRuntimeUrl = exports.getRuntimeToken = exports.getDownloadFileConcurrency = exports.getInitialRetryIntervalInMilliseconds = exports.getRetryMultiplier = exports.getRetryLimit = exports.getUploadChunkSize = exports.getUploadFileConcurrency = void 0;
 // The number of concurrent uploads that happens at the same time
 function getUploadFileConcurrency() {
     return 2;
@@ -4894,6 +5052,10 @@ function getWorkSpaceDirectory() {
     return workspaceDirectory;
 }
 exports.getWorkSpaceDirectory = getWorkSpaceDirectory;
+function getRetentionDays() {
+    return process.env['GITHUB_RETENTION_DAYS'];
+}
+exports.getRetentionDays = getRetentionDays;
 //# sourceMappingURL=config-variables.js.map
 
 /***/ }),
@@ -4943,7 +5105,6 @@ exports.getWorkSpaceDirectory = getWorkSpaceDirectory;
 
 module.exports = glob
 
-var fs = __webpack_require__(747)
 var rp = __webpack_require__(302)
 var minimatch = __webpack_require__(93)
 var Minimatch = minimatch.Minimatch
@@ -4954,8 +5115,6 @@ var assert = __webpack_require__(357)
 var isAbsolute = __webpack_require__(681)
 var globSync = __webpack_require__(245)
 var common = __webpack_require__(856)
-var alphasort = common.alphasort
-var alphasorti = common.alphasorti
 var setopts = common.setopts
 var ownProp = common.ownProp
 var inflight = __webpack_require__(674)
@@ -5406,7 +5565,7 @@ Glob.prototype._readdirInGlobStar = function (abs, cb) {
   var lstatcb = inflight(lstatkey, lstatcb_)
 
   if (lstatcb)
-    fs.lstat(abs, lstatcb)
+    self.fs.lstat(abs, lstatcb)
 
   function lstatcb_ (er, lstat) {
     if (er && er.code === 'ENOENT')
@@ -5447,7 +5606,7 @@ Glob.prototype._readdir = function (abs, inGlobStar, cb) {
   }
 
   var self = this
-  fs.readdir(abs, readdirCb(this, abs, cb))
+  self.fs.readdir(abs, readdirCb(this, abs, cb))
 }
 
 function readdirCb (self, abs, cb) {
@@ -5651,13 +5810,13 @@ Glob.prototype._stat = function (f, cb) {
   var self = this
   var statcb = inflight('stat\0' + abs, lstatcb_)
   if (statcb)
-    fs.lstat(abs, statcb)
+    self.fs.lstat(abs, statcb)
 
   function lstatcb_ (er, lstat) {
     if (lstat && lstat.isSymbolicLink()) {
       // If it's a symlink, then treat it as the target, unless
       // the target does not exist, then treat it as a file.
-      return fs.stat(abs, function (er, stat) {
+      return self.fs.stat(abs, function (er, stat) {
         if (er)
           self._stat2(f, abs, null, lstat, cb)
         else
@@ -5715,14 +5874,27 @@ module.exports = require("crypto");
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.issue = exports.issueCommand = void 0;
 const os = __importStar(__webpack_require__(87));
 const utils_1 = __webpack_require__(82);
 /**
@@ -5802,6 +5974,7 @@ function escapeProperty(s) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.HttpManager = void 0;
 const utils_1 = __webpack_require__(870);
 /**
  * Used for managing http clients during either upload or download
@@ -5839,6 +6012,25 @@ exports.HttpManager = HttpManager;
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -5848,19 +6040,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getIDToken = exports.getState = exports.saveState = exports.group = exports.endGroup = exports.startGroup = exports.info = exports.notice = exports.warning = exports.error = exports.debug = exports.isDebug = exports.setFailed = exports.setCommandEcho = exports.setOutput = exports.getBooleanInput = exports.getMultilineInput = exports.getInput = exports.addPath = exports.setSecret = exports.exportVariable = exports.ExitCode = void 0;
 const command_1 = __webpack_require__(431);
 const file_command_1 = __webpack_require__(102);
 const utils_1 = __webpack_require__(82);
 const os = __importStar(__webpack_require__(87));
 const path = __importStar(__webpack_require__(622));
+const oidc_utils_1 = __webpack_require__(742);
 /**
  * The code to exit an action
  */
@@ -5922,7 +6109,9 @@ function addPath(inputPath) {
 }
 exports.addPath = addPath;
 /**
- * Gets the value of an input.  The value is also trimmed.
+ * Gets the value of an input.
+ * Unless trimWhitespace is set to false in InputOptions, the value is also trimmed.
+ * Returns an empty string if the value is not defined.
  *
  * @param     name     name of the input to get
  * @param     options  optional. See InputOptions.
@@ -5933,9 +6122,49 @@ function getInput(name, options) {
     if (options && options.required && !val) {
         throw new Error(`Input required and not supplied: ${name}`);
     }
+    if (options && options.trimWhitespace === false) {
+        return val;
+    }
     return val.trim();
 }
 exports.getInput = getInput;
+/**
+ * Gets the values of an multiline input.  Each value is also trimmed.
+ *
+ * @param     name     name of the input to get
+ * @param     options  optional. See InputOptions.
+ * @returns   string[]
+ *
+ */
+function getMultilineInput(name, options) {
+    const inputs = getInput(name, options)
+        .split('\n')
+        .filter(x => x !== '');
+    return inputs;
+}
+exports.getMultilineInput = getMultilineInput;
+/**
+ * Gets the input value of the boolean type in the YAML 1.2 "core schema" specification.
+ * Support boolean input list: `true | True | TRUE | false | False | FALSE` .
+ * The return value is also in boolean type.
+ * ref: https://yaml.org/spec/1.2/spec.html#id2804923
+ *
+ * @param     name     name of the input to get
+ * @param     options  optional. See InputOptions.
+ * @returns   boolean
+ */
+function getBooleanInput(name, options) {
+    const trueValue = ['true', 'True', 'TRUE'];
+    const falseValue = ['false', 'False', 'FALSE'];
+    const val = getInput(name, options);
+    if (trueValue.includes(val))
+        return true;
+    if (falseValue.includes(val))
+        return false;
+    throw new TypeError(`Input does not meet YAML 1.2 "Core Schema" specification: ${name}\n` +
+        `Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
+}
+exports.getBooleanInput = getBooleanInput;
 /**
  * Sets the value of an output.
  *
@@ -5944,6 +6173,7 @@ exports.getInput = getInput;
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function setOutput(name, value) {
+    process.stdout.write(os.EOL);
     command_1.issueCommand('set-output', { name }, value);
 }
 exports.setOutput = setOutput;
@@ -5990,19 +6220,30 @@ exports.debug = debug;
 /**
  * Adds an error issue
  * @param message error issue message. Errors will be converted to string via toString()
+ * @param properties optional properties to add to the annotation.
  */
-function error(message) {
-    command_1.issue('error', message instanceof Error ? message.toString() : message);
+function error(message, properties = {}) {
+    command_1.issueCommand('error', utils_1.toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
 exports.error = error;
 /**
- * Adds an warning issue
+ * Adds a warning issue
  * @param message warning issue message. Errors will be converted to string via toString()
+ * @param properties optional properties to add to the annotation.
  */
-function warning(message) {
-    command_1.issue('warning', message instanceof Error ? message.toString() : message);
+function warning(message, properties = {}) {
+    command_1.issueCommand('warning', utils_1.toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
 exports.warning = warning;
+/**
+ * Adds a notice issue
+ * @param message notice issue message. Errors will be converted to string via toString()
+ * @param properties optional properties to add to the annotation.
+ */
+function notice(message, properties = {}) {
+    command_1.issueCommand('notice', utils_1.toCommandProperties(properties), message instanceof Error ? message.toString() : message);
+}
+exports.notice = notice;
 /**
  * Writes info to log with console.log.
  * @param message info message
@@ -6075,7 +6316,113 @@ function getState(name) {
     return process.env[`STATE_${name}`] || '';
 }
 exports.getState = getState;
+function getIDToken(aud) {
+    return __awaiter(this, void 0, void 0, function* () {
+        return yield oidc_utils_1.OidcClient.getIDToken(aud);
+    });
+}
+exports.getIDToken = getIDToken;
+/**
+ * Markdown summary exports
+ */
+var markdown_summary_1 = __webpack_require__(548);
+Object.defineProperty(exports, "markdownSummary", { enumerable: true, get: function () { return markdown_summary_1.markdownSummary; } });
 //# sourceMappingURL=core.js.map
+
+/***/ }),
+
+/***/ 489:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.retryHttpClientRequest = exports.retry = void 0;
+const utils_1 = __webpack_require__(870);
+const core = __importStar(__webpack_require__(470));
+const config_variables_1 = __webpack_require__(401);
+function retry(name, operation, customErrorMessages, maxAttempts) {
+    return __awaiter(this, void 0, void 0, function* () {
+        let response = undefined;
+        let statusCode = undefined;
+        let isRetryable = false;
+        let errorMessage = '';
+        let customErrorInformation = undefined;
+        let attempt = 1;
+        while (attempt <= maxAttempts) {
+            try {
+                response = yield operation();
+                statusCode = response.message.statusCode;
+                if (utils_1.isSuccessStatusCode(statusCode)) {
+                    return response;
+                }
+                // Extra error information that we want to display if a particular response code is hit
+                if (statusCode) {
+                    customErrorInformation = customErrorMessages.get(statusCode);
+                }
+                isRetryable = utils_1.isRetryableStatusCode(statusCode);
+                errorMessage = `Artifact service responded with ${statusCode}`;
+            }
+            catch (error) {
+                isRetryable = true;
+                errorMessage = error.message;
+            }
+            if (!isRetryable) {
+                core.info(`${name} - Error is not retryable`);
+                if (response) {
+                    utils_1.displayHttpDiagnostics(response);
+                }
+                break;
+            }
+            core.info(`${name} - Attempt ${attempt} of ${maxAttempts} failed with error: ${errorMessage}`);
+            yield utils_1.sleep(utils_1.getExponentialRetryTimeInMilliseconds(attempt));
+            attempt++;
+        }
+        if (response) {
+            utils_1.displayHttpDiagnostics(response);
+        }
+        if (customErrorInformation) {
+            throw Error(`${name} failed: ${customErrorInformation}`);
+        }
+        throw Error(`${name} failed: ${errorMessage}`);
+    });
+}
+exports.retry = retry;
+function retryHttpClientRequest(name, method, customErrorMessages = new Map(), maxAttempts = config_variables_1.getRetryLimit()) {
+    return __awaiter(this, void 0, void 0, function* () {
+        return yield retry(name, method, customErrorMessages, maxAttempts);
+    });
+}
+exports.retryHttpClientRequest = retryHttpClientRequest;
+//# sourceMappingURL=requestUtils.js.map
 
 /***/ }),
 
@@ -6246,14 +6593,27 @@ module.exports.uploadArtifacts = uploadArtifacts;
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getDownloadSpecification = void 0;
 const path = __importStar(__webpack_require__(622));
 /**
  * Creates a specification for a set of files that will be downloaded
@@ -6854,6 +7214,366 @@ exports.HttpClient = HttpClient;
 
 /***/ }),
 
+/***/ 548:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.markdownSummary = exports.SUMMARY_DOCS_URL = exports.SUMMARY_ENV_VAR = void 0;
+const os_1 = __webpack_require__(87);
+const fs_1 = __webpack_require__(747);
+const { access, appendFile, writeFile } = fs_1.promises;
+exports.SUMMARY_ENV_VAR = 'GITHUB_STEP_SUMMARY';
+exports.SUMMARY_DOCS_URL = 'https://docs.github.com/actions/using-workflows/workflow-commands-for-github-actions#adding-a-markdown-summary';
+class MarkdownSummary {
+    constructor() {
+        this._buffer = '';
+    }
+    /**
+     * Finds the summary file path from the environment, rejects if env var is not found or file does not exist
+     * Also checks r/w permissions.
+     *
+     * @returns step summary file path
+     */
+    filePath() {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this._filePath) {
+                return this._filePath;
+            }
+            const pathFromEnv = process.env[exports.SUMMARY_ENV_VAR];
+            if (!pathFromEnv) {
+                throw new Error(`Unable to find environment variable for $${exports.SUMMARY_ENV_VAR}. Check if your runtime environment supports markdown summaries.`);
+            }
+            try {
+                yield access(pathFromEnv, fs_1.constants.R_OK | fs_1.constants.W_OK);
+            }
+            catch (_a) {
+                throw new Error(`Unable to access summary file: '${pathFromEnv}'. Check if the file has correct read/write permissions.`);
+            }
+            this._filePath = pathFromEnv;
+            return this._filePath;
+        });
+    }
+    /**
+     * Wraps content in an HTML tag, adding any HTML attributes
+     *
+     * @param {string} tag HTML tag to wrap
+     * @param {string | null} content content within the tag
+     * @param {[attribute: string]: string} attrs key-value list of HTML attributes to add
+     *
+     * @returns {string} content wrapped in HTML element
+     */
+    wrap(tag, content, attrs = {}) {
+        const htmlAttrs = Object.entries(attrs)
+            .map(([key, value]) => ` ${key}="${value}"`)
+            .join('');
+        if (!content) {
+            return `<${tag}${htmlAttrs}>`;
+        }
+        return `<${tag}${htmlAttrs}>${content}</${tag}>`;
+    }
+    /**
+     * Writes text in the buffer to the summary buffer file and empties buffer. Will append by default.
+     *
+     * @param {SummaryWriteOptions} [options] (optional) options for write operation
+     *
+     * @returns {Promise<MarkdownSummary>} markdown summary instance
+     */
+    write(options) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const overwrite = !!(options === null || options === void 0 ? void 0 : options.overwrite);
+            const filePath = yield this.filePath();
+            const writeFunc = overwrite ? writeFile : appendFile;
+            yield writeFunc(filePath, this._buffer, { encoding: 'utf8' });
+            return this.emptyBuffer();
+        });
+    }
+    /**
+     * Clears the summary buffer and wipes the summary file
+     *
+     * @returns {MarkdownSummary} markdown summary instance
+     */
+    clear() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return this.emptyBuffer().write({ overwrite: true });
+        });
+    }
+    /**
+     * Returns the current summary buffer as a string
+     *
+     * @returns {string} string of summary buffer
+     */
+    stringify() {
+        return this._buffer;
+    }
+    /**
+     * If the summary buffer is empty
+     *
+     * @returns {boolen} true if the buffer is empty
+     */
+    isEmptyBuffer() {
+        return this._buffer.length === 0;
+    }
+    /**
+     * Resets the summary buffer without writing to summary file
+     *
+     * @returns {MarkdownSummary} markdown summary instance
+     */
+    emptyBuffer() {
+        this._buffer = '';
+        return this;
+    }
+    /**
+     * Adds raw text to the summary buffer
+     *
+     * @param {string} text content to add
+     * @param {boolean} [addEOL=false] (optional) append an EOL to the raw text (default: false)
+     *
+     * @returns {MarkdownSummary} markdown summary instance
+     */
+    addRaw(text, addEOL = false) {
+        this._buffer += text;
+        return addEOL ? this.addEOL() : this;
+    }
+    /**
+     * Adds the operating system-specific end-of-line marker to the buffer
+     *
+     * @returns {MarkdownSummary} markdown summary instance
+     */
+    addEOL() {
+        return this.addRaw(os_1.EOL);
+    }
+    /**
+     * Adds an HTML codeblock to the summary buffer
+     *
+     * @param {string} code content to render within fenced code block
+     * @param {string} lang (optional) language to syntax highlight code
+     *
+     * @returns {MarkdownSummary} markdown summary instance
+     */
+    addCodeBlock(code, lang) {
+        const attrs = Object.assign({}, (lang && { lang }));
+        const element = this.wrap('pre', this.wrap('code', code), attrs);
+        return this.addRaw(element).addEOL();
+    }
+    /**
+     * Adds an HTML list to the summary buffer
+     *
+     * @param {string[]} items list of items to render
+     * @param {boolean} [ordered=false] (optional) if the rendered list should be ordered or not (default: false)
+     *
+     * @returns {MarkdownSummary} markdown summary instance
+     */
+    addList(items, ordered = false) {
+        const tag = ordered ? 'ol' : 'ul';
+        const listItems = items.map(item => this.wrap('li', item)).join('');
+        const element = this.wrap(tag, listItems);
+        return this.addRaw(element).addEOL();
+    }
+    /**
+     * Adds an HTML table to the summary buffer
+     *
+     * @param {SummaryTableCell[]} rows table rows
+     *
+     * @returns {MarkdownSummary} markdown summary instance
+     */
+    addTable(rows) {
+        const tableBody = rows
+            .map(row => {
+            const cells = row
+                .map(cell => {
+                if (typeof cell === 'string') {
+                    return this.wrap('td', cell);
+                }
+                const { header, data, colspan, rowspan } = cell;
+                const tag = header ? 'th' : 'td';
+                const attrs = Object.assign(Object.assign({}, (colspan && { colspan })), (rowspan && { rowspan }));
+                return this.wrap(tag, data, attrs);
+            })
+                .join('');
+            return this.wrap('tr', cells);
+        })
+            .join('');
+        const element = this.wrap('table', tableBody);
+        return this.addRaw(element).addEOL();
+    }
+    /**
+     * Adds a collapsable HTML details element to the summary buffer
+     *
+     * @param {string} label text for the closed state
+     * @param {string} content collapsable content
+     *
+     * @returns {MarkdownSummary} markdown summary instance
+     */
+    addDetails(label, content) {
+        const element = this.wrap('details', this.wrap('summary', label) + content);
+        return this.addRaw(element).addEOL();
+    }
+    /**
+     * Adds an HTML image tag to the summary buffer
+     *
+     * @param {string} src path to the image you to embed
+     * @param {string} alt text description of the image
+     * @param {SummaryImageOptions} options (optional) addition image attributes
+     *
+     * @returns {MarkdownSummary} markdown summary instance
+     */
+    addImage(src, alt, options) {
+        const { width, height } = options || {};
+        const attrs = Object.assign(Object.assign({}, (width && { width })), (height && { height }));
+        const element = this.wrap('img', null, Object.assign({ src, alt }, attrs));
+        return this.addRaw(element).addEOL();
+    }
+    /**
+     * Adds an HTML section heading element
+     *
+     * @param {string} text heading text
+     * @param {number | string} [level=1] (optional) the heading level, default: 1
+     *
+     * @returns {MarkdownSummary} markdown summary instance
+     */
+    addHeading(text, level) {
+        const tag = `h${level}`;
+        const allowedTag = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tag)
+            ? tag
+            : 'h1';
+        const element = this.wrap(allowedTag, text);
+        return this.addRaw(element).addEOL();
+    }
+    /**
+     * Adds an HTML thematic break (<hr>) to the summary buffer
+     *
+     * @returns {MarkdownSummary} markdown summary instance
+     */
+    addSeparator() {
+        const element = this.wrap('hr', null);
+        return this.addRaw(element).addEOL();
+    }
+    /**
+     * Adds an HTML line break (<br>) to the summary buffer
+     *
+     * @returns {MarkdownSummary} markdown summary instance
+     */
+    addBreak() {
+        const element = this.wrap('br', null);
+        return this.addRaw(element).addEOL();
+    }
+    /**
+     * Adds an HTML blockquote to the summary buffer
+     *
+     * @param {string} text quote text
+     * @param {string} cite (optional) citation url
+     *
+     * @returns {MarkdownSummary} markdown summary instance
+     */
+    addQuote(text, cite) {
+        const attrs = Object.assign({}, (cite && { cite }));
+        const element = this.wrap('blockquote', text, attrs);
+        return this.addRaw(element).addEOL();
+    }
+    /**
+     * Adds an HTML anchor tag to the summary buffer
+     *
+     * @param {string} text link text/content
+     * @param {string} href hyperlink
+     *
+     * @returns {MarkdownSummary} markdown summary instance
+     */
+    addLink(text, href) {
+        const element = this.wrap('a', text, { href });
+        return this.addRaw(element).addEOL();
+    }
+}
+// singleton export
+exports.markdownSummary = new MarkdownSummary();
+//# sourceMappingURL=markdown-summary.js.map
+
+/***/ }),
+
+/***/ 553:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.checkArtifactFilePath = exports.checkArtifactName = void 0;
+const core_1 = __webpack_require__(470);
+/**
+ * Invalid characters that cannot be in the artifact name or an uploaded file. Will be rejected
+ * from the server if attempted to be sent over. These characters are not allowed due to limitations with certain
+ * file systems such as NTFS. To maintain platform-agnostic behavior, all characters that are not supported by an
+ * individual filesystem/platform will not be supported on all fileSystems/platforms
+ *
+ * FilePaths can include characters such as \ and / which are not permitted in the artifact name alone
+ */
+const invalidArtifactFilePathCharacters = new Map([
+    ['"', ' Double quote "'],
+    [':', ' Colon :'],
+    ['<', ' Less than <'],
+    ['>', ' Greater than >'],
+    ['|', ' Vertical bar |'],
+    ['*', ' Asterisk *'],
+    ['?', ' Question mark ?'],
+    ['\r', ' Carriage return \\r'],
+    ['\n', ' Line feed \\n']
+]);
+const invalidArtifactNameCharacters = new Map([
+    ...invalidArtifactFilePathCharacters,
+    ['\\', ' Backslash \\'],
+    ['/', ' Forward slash /']
+]);
+/**
+ * Scans the name of the artifact to make sure there are no illegal characters
+ */
+function checkArtifactName(name) {
+    if (!name) {
+        throw new Error(`Artifact name: ${name}, is incorrectly provided`);
+    }
+    for (const [invalidCharacterKey, errorMessageForCharacter] of invalidArtifactNameCharacters) {
+        if (name.includes(invalidCharacterKey)) {
+            throw new Error(`Artifact name is not valid: ${name}. Contains the following character: ${errorMessageForCharacter}
+          
+Invalid characters include: ${Array.from(invalidArtifactNameCharacters.values()).toString()}
+          
+These characters are not allowed in the artifact name due to limitations with certain file systems such as NTFS. To maintain file system agnostic behavior, these characters are intentionally not allowed to prevent potential problems with downloads on different file systems.`);
+        }
+    }
+    core_1.info(`Artifact name is valid!`);
+}
+exports.checkArtifactName = checkArtifactName;
+/**
+ * Scans the name of the filePath used to make sure there are no illegal characters
+ */
+function checkArtifactFilePath(path) {
+    if (!path) {
+        throw new Error(`Artifact path: ${path}, is incorrectly provided`);
+    }
+    for (const [invalidCharacterKey, errorMessageForCharacter] of invalidArtifactFilePathCharacters) {
+        if (path.includes(invalidCharacterKey)) {
+            throw new Error(`Artifact path is not valid: ${path}. Contains the following character: ${errorMessageForCharacter}
+          
+Invalid characters include: ${Array.from(invalidArtifactFilePathCharacters.values()).toString()}
+          
+The following characters are not allowed in files that are uploaded due to limitations with certain file systems such as NTFS. To maintain file system agnostic behavior, these characters are intentionally not allowed to prevent potential problems with downloads on different file systems.
+          `);
+        }
+    }
+}
+exports.checkArtifactFilePath = checkArtifactFilePath;
+//# sourceMappingURL=path-and-artifact-name-validation.js.map
+
+/***/ }),
+
 /***/ 566:
 /***/ (function(module) {
 
@@ -6891,27 +7611,28 @@ if (typeof Object.create === 'function') {
 /***/ 569:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-module.exports = rimraf
-rimraf.sync = rimrafSync
+const assert = __webpack_require__(357)
+const path = __webpack_require__(622)
+const fs = __webpack_require__(747)
+let glob = undefined
+try {
+  glob = __webpack_require__(402)
+} catch (_err) {
+  // treat glob as optional.
+}
 
-var assert = __webpack_require__(357)
-var path = __webpack_require__(622)
-var fs = __webpack_require__(747)
-var glob = __webpack_require__(402)
-var _0666 = parseInt('666', 8)
-
-var defaultGlobOpts = {
+const defaultGlobOpts = {
   nosort: true,
   silent: true
 }
 
 // for EMFILE handling
-var timeout = 0
+let timeout = 0
 
-var isWindows = (process.platform === "win32")
+const isWindows = (process.platform === "win32")
 
-function defaults (options) {
-  var methods = [
+const defaults = options => {
+  const methods = [
     'unlink',
     'chmod',
     'stat',
@@ -6919,7 +7640,7 @@ function defaults (options) {
     'rmdir',
     'readdir'
   ]
-  methods.forEach(function(m) {
+  methods.forEach(m => {
     options[m] = options[m] || fs[m]
     m = m + 'Sync'
     options[m] = options[m] || fs[m]
@@ -6930,11 +7651,14 @@ function defaults (options) {
   if (options.glob === false) {
     options.disableGlob = true
   }
+  if (options.disableGlob !== true && glob === undefined) {
+    throw Error('glob dependency not found, set `options.disableGlob = true` if intentional')
+  }
   options.disableGlob = options.disableGlob || false
   options.glob = options.glob || defaultGlobOpts
 }
 
-function rimraf (p, options, cb) {
+const rimraf = (p, options, cb) => {
   if (typeof options === 'function') {
     cb = options
     options = {}
@@ -6948,27 +7672,17 @@ function rimraf (p, options, cb) {
 
   defaults(options)
 
-  var busyTries = 0
-  var errState = null
-  var n = 0
+  let busyTries = 0
+  let errState = null
+  let n = 0
 
-  if (options.disableGlob || !glob.hasMagic(p))
-    return afterGlob(null, [p])
-
-  options.lstat(p, function (er, stat) {
-    if (!er)
-      return afterGlob(null, [p])
-
-    glob(p, options.glob, afterGlob)
-  })
-
-  function next (er) {
+  const next = (er) => {
     errState = errState || er
     if (--n === 0)
       cb(errState)
   }
 
-  function afterGlob (er, results) {
+  const afterGlob = (er, results) => {
     if (er)
       return cb(er)
 
@@ -6976,24 +7690,19 @@ function rimraf (p, options, cb) {
     if (n === 0)
       return cb()
 
-    results.forEach(function (p) {
-      rimraf_(p, options, function CB (er) {
+    results.forEach(p => {
+      const CB = (er) => {
         if (er) {
           if ((er.code === "EBUSY" || er.code === "ENOTEMPTY" || er.code === "EPERM") &&
               busyTries < options.maxBusyTries) {
             busyTries ++
-            var time = busyTries * 100
             // try again, with the same exact callback as this one.
-            return setTimeout(function () {
-              rimraf_(p, options, CB)
-            }, time)
+            return setTimeout(() => rimraf_(p, options, CB), busyTries * 100)
           }
 
           // this one won't happen if graceful-fs is used.
           if (er.code === "EMFILE" && timeout < options.emfileWait) {
-            return setTimeout(function () {
-              rimraf_(p, options, CB)
-            }, timeout ++)
+            return setTimeout(() => rimraf_(p, options, CB), timeout ++)
           }
 
           // already gone
@@ -7002,9 +7711,21 @@ function rimraf (p, options, cb) {
 
         timeout = 0
         next(er)
-      })
+      }
+      rimraf_(p, options, CB)
     })
   }
+
+  if (options.disableGlob || !glob.hasMagic(p))
+    return afterGlob(null, [p])
+
+  options.lstat(p, (er, stat) => {
+    if (!er)
+      return afterGlob(null, [p])
+
+    glob(p, options.glob, afterGlob)
+  })
+
 }
 
 // Two possible strategies.
@@ -7018,14 +7739,14 @@ function rimraf (p, options, cb) {
 //
 // If anyone ever complains about this, then I guess the strategy could
 // be made configurable somehow.  But until then, YAGNI.
-function rimraf_ (p, options, cb) {
+const rimraf_ = (p, options, cb) => {
   assert(p)
   assert(options)
   assert(typeof cb === 'function')
 
   // sunos lets the root user unlink directories, which is... weird.
   // so we have to lstat here and make sure it's not a dir.
-  options.lstat(p, function (er, st) {
+  options.lstat(p, (er, st) => {
     if (er && er.code === "ENOENT")
       return cb(null)
 
@@ -7036,7 +7757,7 @@ function rimraf_ (p, options, cb) {
     if (st && st.isDirectory())
       return rmdir(p, options, er, cb)
 
-    options.unlink(p, function (er) {
+    options.unlink(p, er => {
       if (er) {
         if (er.code === "ENOENT")
           return cb(null)
@@ -7052,18 +7773,16 @@ function rimraf_ (p, options, cb) {
   })
 }
 
-function fixWinEPERM (p, options, er, cb) {
+const fixWinEPERM = (p, options, er, cb) => {
   assert(p)
   assert(options)
   assert(typeof cb === 'function')
-  if (er)
-    assert(er instanceof Error)
 
-  options.chmod(p, _0666, function (er2) {
+  options.chmod(p, 0o666, er2 => {
     if (er2)
       cb(er2.code === "ENOENT" ? null : er)
     else
-      options.stat(p, function(er3, stats) {
+      options.stat(p, (er3, stats) => {
         if (er3)
           cb(er3.code === "ENOENT" ? null : er)
         else if (stats.isDirectory())
@@ -7074,14 +7793,12 @@ function fixWinEPERM (p, options, er, cb) {
   })
 }
 
-function fixWinEPERMSync (p, options, er) {
+const fixWinEPERMSync = (p, options, er) => {
   assert(p)
   assert(options)
-  if (er)
-    assert(er instanceof Error)
 
   try {
-    options.chmodSync(p, _0666)
+    options.chmodSync(p, 0o666)
   } catch (er2) {
     if (er2.code === "ENOENT")
       return
@@ -7089,8 +7806,9 @@ function fixWinEPERMSync (p, options, er) {
       throw er
   }
 
+  let stats
   try {
-    var stats = options.statSync(p)
+    stats = options.statSync(p)
   } catch (er3) {
     if (er3.code === "ENOENT")
       return
@@ -7104,17 +7822,15 @@ function fixWinEPERMSync (p, options, er) {
     options.unlinkSync(p)
 }
 
-function rmdir (p, options, originalEr, cb) {
+const rmdir = (p, options, originalEr, cb) => {
   assert(p)
   assert(options)
-  if (originalEr)
-    assert(originalEr instanceof Error)
   assert(typeof cb === 'function')
 
   // try to rmdir first, and only readdir on ENOTEMPTY or EEXIST (SunOS)
   // if we guessed wrong, and it's not a directory, then
   // raise the original error.
-  options.rmdir(p, function (er) {
+  options.rmdir(p, er => {
     if (er && (er.code === "ENOTEMPTY" || er.code === "EEXIST" || er.code === "EPERM"))
       rmkids(p, options, cb)
     else if (er && er.code === "ENOTDIR")
@@ -7124,20 +7840,20 @@ function rmdir (p, options, originalEr, cb) {
   })
 }
 
-function rmkids(p, options, cb) {
+const rmkids = (p, options, cb) => {
   assert(p)
   assert(options)
   assert(typeof cb === 'function')
 
-  options.readdir(p, function (er, files) {
+  options.readdir(p, (er, files) => {
     if (er)
       return cb(er)
-    var n = files.length
+    let n = files.length
     if (n === 0)
       return options.rmdir(p, cb)
-    var errState
-    files.forEach(function (f) {
-      rimraf(path.join(p, f), options, function (er) {
+    let errState
+    files.forEach(f => {
+      rimraf(path.join(p, f), options, er => {
         if (errState)
           return
         if (er)
@@ -7152,7 +7868,7 @@ function rmkids(p, options, cb) {
 // this looks simpler, and is strictly *faster*, but will
 // tie up the JavaScript thread and fail on excessively
 // deep directory trees.
-function rimrafSync (p, options) {
+const rimrafSync = (p, options) => {
   options = options || {}
   defaults(options)
 
@@ -7161,7 +7877,7 @@ function rimrafSync (p, options) {
   assert(options, 'rimraf: missing options')
   assert.equal(typeof options, 'object', 'rimraf: options should be object')
 
-  var results
+  let results
 
   if (options.disableGlob || !glob.hasMagic(p)) {
     results = [p]
@@ -7177,11 +7893,12 @@ function rimrafSync (p, options) {
   if (!results.length)
     return
 
-  for (var i = 0; i < results.length; i++) {
-    var p = results[i]
+  for (let i = 0; i < results.length; i++) {
+    const p = results[i]
 
+    let st
     try {
-      var st = options.lstatSync(p)
+      st = options.lstatSync(p)
     } catch (er) {
       if (er.code === "ENOENT")
         return
@@ -7210,11 +7927,9 @@ function rimrafSync (p, options) {
   }
 }
 
-function rmdirSync (p, options, originalEr) {
+const rmdirSync = (p, options, originalEr) => {
   assert(p)
   assert(options)
-  if (originalEr)
-    assert(originalEr instanceof Error)
 
   try {
     options.rmdirSync(p)
@@ -7228,12 +7943,10 @@ function rmdirSync (p, options, originalEr) {
   }
 }
 
-function rmkidsSync (p, options) {
+const rmkidsSync = (p, options) => {
   assert(p)
   assert(options)
-  options.readdirSync(p).forEach(function (f) {
-    rimrafSync(path.join(p, f), options)
-  })
+  options.readdirSync(p).forEach(f => rimrafSync(path.join(p, f), options))
 
   // We only end up here once we got ENOTEMPTY at least once, and
   // at this point, we are guaranteed to have removed all the kids.
@@ -7241,12 +7954,12 @@ function rmkidsSync (p, options) {
   // try really hard to delete stuff on windows, because it has a
   // PROFOUNDLY annoying habit of not closing handles promptly when
   // files are deleted, resulting in spurious ENOTEMPTY errors.
-  var retries = isWindows ? 100 : 1
-  var i = 0
+  const retries = isWindows ? 100 : 1
+  let i = 0
   do {
-    var threw = true
+    let threw = true
     try {
-      var ret = options.rmdirSync(p, options)
+      const ret = options.rmdirSync(p, options)
       threw = false
       return ret
     } finally {
@@ -7256,6 +7969,9 @@ function rmkidsSync (p, options) {
   } while (true)
 }
 
+module.exports = rimraf
+rimraf.sync = rimrafSync
+
 
 /***/ }),
 
@@ -7264,18 +7980,31 @@ function rmkidsSync (p, options) {
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getUploadSpecification = void 0;
 const fs = __importStar(__webpack_require__(747));
 const core_1 = __webpack_require__(470);
 const path_1 = __webpack_require__(622);
-const utils_1 = __webpack_require__(870);
+const path_and_artifact_name_validation_1 = __webpack_require__(553);
 /**
  * Creates a specification that describes how each file that is part of the artifact will be uploaded
  * @param artifactName the name of the artifact being uploaded. Used during upload to denote where the artifact is stored on the server
@@ -7283,7 +8012,7 @@ const utils_1 = __webpack_require__(870);
  * @param artifactFiles a list of absolute file paths that denote what should be uploaded as part of the artifact
  */
 function getUploadSpecification(artifactName, rootDirectory, artifactFiles) {
-    utils_1.checkArtifactName(artifactName);
+    // artifact name was checked earlier on, no need to check again
     const specifications = [];
     if (!fs.existsSync(rootDirectory)) {
         throw new Error(`Provided rootDirectory ${rootDirectory} does not exist`);
@@ -7326,7 +8055,7 @@ function getUploadSpecification(artifactName, rootDirectory, artifactFiles) {
             }
             // Check for forbidden characters in file paths that will be rejected during upload
             const uploadPath = file.replace(rootDirectory, '');
-            utils_1.checkArtifactFilePath(uploadPath);
+            path_and_artifact_name_validation_1.checkArtifactFilePath(uploadPath);
             /*
               uploadFilePath denotes where the file will be uploaded in the file container on the server. During a run, if multiple artifacts are uploaded, they will all
               be saved in the same container. The artifact name is used as the root directory in the container to separate and distinguish uploaded artifacts
@@ -7366,6 +8095,25 @@ module.exports = require("http");
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -7375,14 +8123,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.UploadHttpClient = void 0;
 const fs = __importStar(__webpack_require__(747));
 const core = __importStar(__webpack_require__(470));
 const tmp = __importStar(__webpack_require__(875));
@@ -7393,8 +8135,10 @@ const util_1 = __webpack_require__(669);
 const url_1 = __webpack_require__(835);
 const perf_hooks_1 = __webpack_require__(630);
 const status_reporter_1 = __webpack_require__(176);
+const http_client_1 = __webpack_require__(539);
 const http_manager_1 = __webpack_require__(452);
 const upload_gzip_1 = __webpack_require__(647);
+const requestUtils_1 = __webpack_require__(489);
 const stat = util_1.promisify(fs.stat);
 class UploadHttpClient {
     constructor() {
@@ -7406,31 +8150,38 @@ class UploadHttpClient {
      * @param {string} artifactName Name of the artifact being created
      * @returns The response from the Artifact Service if the file container was successfully created
      */
-    createArtifactInFileContainer(artifactName) {
+    createArtifactInFileContainer(artifactName, options) {
         return __awaiter(this, void 0, void 0, function* () {
             const parameters = {
                 Type: 'actions_storage',
                 Name: artifactName
             };
+            // calculate retention period
+            if (options && options.retentionDays) {
+                const maxRetentionStr = config_variables_1.getRetentionDays();
+                parameters.RetentionDays = utils_1.getProperRetention(options.retentionDays, maxRetentionStr);
+            }
             const data = JSON.stringify(parameters, null, 2);
             const artifactUrl = utils_1.getArtifactUrl();
             // use the first client from the httpManager, `keep-alive` is not used so the connection will close immediately
             const client = this.uploadHttpManager.getClient(0);
             const headers = utils_1.getUploadHeaders('application/json', false);
-            const rawResponse = yield client.post(artifactUrl, data, headers);
-            const body = yield rawResponse.readBody();
-            if (utils_1.isSuccessStatusCode(rawResponse.message.statusCode) && body) {
-                return JSON.parse(body);
-            }
-            else if (utils_1.isForbiddenStatusCode(rawResponse.message.statusCode)) {
-                // if a 403 is returned when trying to create a file container, the customer has exceeded
-                // their storage quota so no new artifact containers can be created
-                throw new Error(`Artifact storage quota has been hit. Unable to upload any new artifacts`);
-            }
-            else {
-                utils_1.displayHttpDiagnostics(rawResponse);
-                throw new Error(`Unable to create a container for the artifact ${artifactName} at ${artifactUrl}`);
-            }
+            // Extra information to display when a particular HTTP code is returned
+            // If a 403 is returned when trying to create a file container, the customer has exceeded
+            // their storage quota so no new artifact containers can be created
+            const customErrorMessages = new Map([
+                [
+                    http_client_1.HttpCodes.Forbidden,
+                    'Artifact storage quota has been hit. Unable to upload any new artifacts'
+                ],
+                [
+                    http_client_1.HttpCodes.BadRequest,
+                    `The artifact name ${artifactName} is not valid. Request URL ${artifactUrl}`
+                ]
+            ]);
+            const response = yield requestUtils_1.retryHttpClientRequest('Create Artifact Container', () => __awaiter(this, void 0, void 0, function* () { return client.post(artifactUrl, data, headers); }), customErrorMessages);
+            const body = yield response.readBody();
+            return JSON.parse(body);
         });
     }
     /**
@@ -7519,27 +8270,33 @@ class UploadHttpClient {
      */
     uploadFileAsync(httpClientIndex, parameters) {
         return __awaiter(this, void 0, void 0, function* () {
-            const totalFileSize = (yield stat(parameters.file)).size;
+            const fileStat = yield stat(parameters.file);
+            const totalFileSize = fileStat.size;
+            const isFIFO = fileStat.isFIFO();
             let offset = 0;
             let isUploadSuccessful = true;
             let failedChunkSizes = 0;
             let uploadFileSize = 0;
             let isGzip = true;
-            // the file that is being uploaded is less than 64k in size, to increase throughput and to minimize disk I/O
+            // the file that is being uploaded is less than 64k in size to increase throughput and to minimize disk I/O
             // for creating a new GZip file, an in-memory buffer is used for compression
-            if (totalFileSize < 65536) {
+            // with named pipes the file size is reported as zero in that case don't read the file in memory
+            if (!isFIFO && totalFileSize < 65536) {
+                core.debug(`${parameters.file} is less than 64k in size. Creating a gzip file in-memory to potentially reduce the upload size`);
                 const buffer = yield upload_gzip_1.createGZipFileInBuffer(parameters.file);
-                //An open stream is needed in the event of a failure and we need to retry. If a NodeJS.ReadableStream is directly passed in,
+                // An open stream is needed in the event of a failure and we need to retry. If a NodeJS.ReadableStream is directly passed in,
                 // it will not properly get reset to the start of the stream if a chunk upload needs to be retried
                 let openUploadStream;
                 if (totalFileSize < buffer.byteLength) {
                     // compression did not help with reducing the size, use a readable stream from the original file for upload
+                    core.debug(`The gzip file created for ${parameters.file} did not help with reducing the size of the file. The original file will be uploaded as-is`);
                     openUploadStream = () => fs.createReadStream(parameters.file);
                     isGzip = false;
                     uploadFileSize = totalFileSize;
                 }
                 else {
                     // create a readable stream using a PassThrough stream that is both readable and writable
+                    core.debug(`A gzip file created for ${parameters.file} helped with reducing the size of the original file. The file will be uploaded using gzip.`);
                     openUploadStream = () => {
                         const passThrough = new stream.PassThrough();
                         passThrough.end(buffer);
@@ -7564,25 +8321,27 @@ class UploadHttpClient {
                 // the file that is being uploaded is greater than 64k in size, a temporary file gets created on disk using the
                 // npm tmp-promise package and this file gets used to create a GZipped file
                 const tempFile = yield tmp.file();
+                core.debug(`${parameters.file} is greater than 64k in size. Creating a gzip file on-disk ${tempFile.path} to potentially reduce the upload size`);
                 // create a GZip file of the original file being uploaded, the original file should not be modified in any way
                 uploadFileSize = yield upload_gzip_1.createGZipFileOnDisk(parameters.file, tempFile.path);
                 let uploadFilePath = tempFile.path;
                 // compression did not help with size reduction, use the original file for upload and delete the temp GZip file
-                if (totalFileSize < uploadFileSize) {
+                // for named pipes totalFileSize is zero, this assumes compression did help
+                if (!isFIFO && totalFileSize < uploadFileSize) {
+                    core.debug(`The gzip file created for ${parameters.file} did not help with reducing the size of the file. The original file will be uploaded as-is`);
                     uploadFileSize = totalFileSize;
                     uploadFilePath = parameters.file;
                     isGzip = false;
+                }
+                else {
+                    core.debug(`The gzip file created for ${parameters.file} is smaller than the original file. The file will be uploaded using gzip.`);
                 }
                 let abortFileUpload = false;
                 // upload only a single chunk at a time
                 while (offset < uploadFileSize) {
                     const chunkSize = Math.min(uploadFileSize - offset, parameters.maxChunkSize);
-                    // if an individual file is greater than 100MB (1024*1024*100) in size, display extra information about the upload status
-                    if (uploadFileSize > 104857600) {
-                        this.statusReporter.updateLargeFileStatus(parameters.file, offset, uploadFileSize);
-                    }
-                    const start = offset;
-                    const end = offset + chunkSize - 1;
+                    const startChunkIndex = offset;
+                    const endChunkIndex = offset + chunkSize - 1;
                     offset += parameters.maxChunkSize;
                     if (abortFileUpload) {
                         // if we don't want to continue in the event of an error, any pending upload chunks will be marked as failed
@@ -7590,10 +8349,10 @@ class UploadHttpClient {
                         continue;
                     }
                     const result = yield this.uploadChunk(httpClientIndex, parameters.resourceUrl, () => fs.createReadStream(uploadFilePath, {
-                        start,
-                        end,
+                        start: startChunkIndex,
+                        end: endChunkIndex,
                         autoClose: false
-                    }), start, end, uploadFileSize, isGzip, totalFileSize);
+                    }), startChunkIndex, endChunkIndex, uploadFileSize, isGzip, totalFileSize);
                     if (!result) {
                         // Chunk failed to upload, report as failed and do not continue uploading any more chunks for the file. It is possible that part of a chunk was
                         // successfully uploaded so the server may report a different size for what was uploaded
@@ -7602,9 +8361,16 @@ class UploadHttpClient {
                         core.warning(`Aborting upload for ${parameters.file} due to failure`);
                         abortFileUpload = true;
                     }
+                    else {
+                        // if an individual file is greater than 8MB (1024*1024*8) in size, display extra information about the upload status
+                        if (uploadFileSize > 8388608) {
+                            this.statusReporter.updateLargeFileStatus(parameters.file, startChunkIndex, endChunkIndex, uploadFileSize);
+                        }
+                    }
                 }
                 // Delete the temporary file that was created as part of the upload. If the temp file does not get manually deleted by
                 // calling cleanup, it gets removed when the node process exits. For more info see: https://www.npmjs.com/package/tmp-promise#about
+                core.debug(`deleting temporary gzip file ${tempFile.path}`);
                 yield tempFile.cleanup();
                 return {
                     isSuccess: isUploadSuccessful,
@@ -7654,12 +8420,12 @@ class UploadHttpClient {
                 this.uploadHttpManager.disposeAndReplaceClient(httpClientIndex);
                 if (retryAfterValue) {
                     core.info(`Backoff due to too many requests, retry #${retryCount}. Waiting for ${retryAfterValue} milliseconds before continuing the upload`);
-                    yield new Promise(resolve => setTimeout(resolve, retryAfterValue));
+                    yield utils_1.sleep(retryAfterValue);
                 }
                 else {
                     const backoffTime = utils_1.getExponentialRetryTimeInMilliseconds(retryCount);
                     core.info(`Exponential backoff for retry #${retryCount}. Waiting for ${backoffTime} milliseconds before continuing the upload at offset ${start}`);
-                    yield new Promise(resolve => setTimeout(resolve, backoffTime));
+                    yield utils_1.sleep(backoffTime);
                 }
                 core.info(`Finished backoff for retry #${retryCount}, continuing with upload`);
                 return;
@@ -7711,7 +8477,6 @@ class UploadHttpClient {
      */
     patchArtifactSize(size, artifactName) {
         return __awaiter(this, void 0, void 0, function* () {
-            const headers = utils_1.getUploadHeaders('application/json', false);
             const resourceUrl = new url_1.URL(utils_1.getArtifactUrl());
             resourceUrl.searchParams.append('artifactName', artifactName);
             const parameters = { Size: size };
@@ -7719,19 +8484,18 @@ class UploadHttpClient {
             core.debug(`URL is ${resourceUrl.toString()}`);
             // use the first client from the httpManager, `keep-alive` is not used so the connection will close immediately
             const client = this.uploadHttpManager.getClient(0);
-            const response = yield client.patch(resourceUrl.toString(), data, headers);
-            const body = yield response.readBody();
-            if (utils_1.isSuccessStatusCode(response.message.statusCode)) {
-                core.debug(`Artifact ${artifactName} has been successfully uploaded, total size in bytes: ${size}`);
-            }
-            else if (response.message.statusCode === 404) {
-                throw new Error(`An Artifact with the name ${artifactName} was not found`);
-            }
-            else {
-                utils_1.displayHttpDiagnostics(response);
-                core.info(body);
-                throw new Error(`Unable to finish uploading artifact ${artifactName} to ${resourceUrl}`);
-            }
+            const headers = utils_1.getUploadHeaders('application/json', false);
+            // Extra information to display when a particular HTTP code is returned
+            const customErrorMessages = new Map([
+                [
+                    http_client_1.HttpCodes.NotFound,
+                    `An Artifact with the name ${artifactName} was not found`
+                ]
+            ]);
+            // TODO retry for all possible response codes, the artifact upload is pretty much complete so it at all costs we should try to finish this
+            const response = yield requestUtils_1.retryHttpClientRequest('Finalize artifact upload', () => __awaiter(this, void 0, void 0, function* () { return client.patch(resourceUrl.toString(), data, headers); }), customErrorMessages);
+            yield response.readBody();
+            core.debug(`Artifact ${artifactName} has been successfully uploaded, total size in bytes: ${size}`);
         });
     }
 }
@@ -7843,6 +8607,25 @@ module.exports = require("net");
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -7859,18 +8642,25 @@ var __asyncValues = (this && this.__asyncValues) || function (o) {
     function verb(n) { i[n] = o[n] && function (v) { return new Promise(function (resolve, reject) { v = o[n](v), settle(resolve, reject, v.done, v.value); }); }; }
     function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
 };
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.createGZipFileInBuffer = exports.createGZipFileOnDisk = void 0;
 const fs = __importStar(__webpack_require__(747));
 const zlib = __importStar(__webpack_require__(761));
 const util_1 = __webpack_require__(669);
 const stat = util_1.promisify(fs.stat);
+/**
+ * GZipping certain files that are already compressed will likely not yield further size reductions. Creating large temporary gzip
+ * files then will just waste a lot of time before ultimately being discarded (especially for very large files).
+ * If any of these types of files are encountered then on-disk gzip creation will be skipped and the original file will be uploaded as-is
+ */
+const gzipExemptFileExtensions = [
+    '.gzip',
+    '.zip',
+    '.tar.lz',
+    '.tar.gz',
+    '.tar.bz2',
+    '.7z'
+];
 /**
  * Creates a Gzip compressed file of an original file at the provided temporary filepath location
  * @param {string} originalFilePath filepath of whatever will be compressed. The original file will be unmodified
@@ -7879,6 +8669,12 @@ const stat = util_1.promisify(fs.stat);
  */
 function createGZipFileOnDisk(originalFilePath, tempFilePath) {
     return __awaiter(this, void 0, void 0, function* () {
+        for (const gzipExemptExtension of gzipExemptFileExtensions) {
+            if (originalFilePath.endsWith(gzipExemptExtension)) {
+                // return a really large number so that the original file gets uploaded
+                return Number.MAX_SAFE_INTEGER;
+            }
+        }
         return new Promise((resolve, reject) => {
             const inputStream = fs.createReadStream(originalFilePath);
             const gzip = zlib.createGzip();
@@ -7946,6 +8742,25 @@ module.exports = require("util");
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -7955,16 +8770,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
 var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
-const assert_1 = __webpack_require__(357);
+exports.getCmdPath = exports.tryGetExecutablePath = exports.isRooted = exports.isDirectory = exports.exists = exports.IS_WINDOWS = exports.unlink = exports.symlink = exports.stat = exports.rmdir = exports.rename = exports.readlink = exports.readdir = exports.mkdir = exports.lstat = exports.copyFile = exports.chmod = void 0;
 const fs = __importStar(__webpack_require__(747));
 const path = __importStar(__webpack_require__(622));
 _a = fs.promises, exports.chmod = _a.chmod, exports.copyFile = _a.copyFile, exports.lstat = _a.lstat, exports.mkdir = _a.mkdir, exports.readdir = _a.readdir, exports.readlink = _a.readlink, exports.rename = _a.rename, exports.rmdir = _a.rmdir, exports.stat = _a.stat, exports.symlink = _a.symlink, exports.unlink = _a.unlink;
@@ -8007,49 +8815,6 @@ function isRooted(p) {
     return p.startsWith('/');
 }
 exports.isRooted = isRooted;
-/**
- * Recursively create a directory at `fsPath`.
- *
- * This implementation is optimistic, meaning it attempts to create the full
- * path first, and backs up the path stack from there.
- *
- * @param fsPath The path to create
- * @param maxDepth The maximum recursion depth
- * @param depth The current recursion depth
- */
-function mkdirP(fsPath, maxDepth = 1000, depth = 1) {
-    return __awaiter(this, void 0, void 0, function* () {
-        assert_1.ok(fsPath, 'a path argument must be provided');
-        fsPath = path.resolve(fsPath);
-        if (depth >= maxDepth)
-            return exports.mkdir(fsPath);
-        try {
-            yield exports.mkdir(fsPath);
-            return;
-        }
-        catch (err) {
-            switch (err.code) {
-                case 'ENOENT': {
-                    yield mkdirP(path.dirname(fsPath), maxDepth, depth + 1);
-                    yield exports.mkdir(fsPath);
-                    return;
-                }
-                default: {
-                    let stats;
-                    try {
-                        stats = yield exports.stat(fsPath);
-                    }
-                    catch (err2) {
-                        throw err;
-                    }
-                    if (!stats.isDirectory())
-                        throw err;
-                }
-            }
-        }
-    });
-}
-exports.mkdirP = mkdirP;
 /**
  * Best effort attempt to determine whether a file exists and is executable.
  * @param filePath    file path to check
@@ -8146,6 +8911,12 @@ function isUnixExecutable(stats) {
         ((stats.mode & 8) > 0 && stats.gid === process.getgid()) ||
         ((stats.mode & 64) > 0 && stats.uid === process.getuid()));
 }
+// Get the path of cmd.exe in windows
+function getCmdPath() {
+    var _a;
+    return (_a = process.env['COMSPEC']) !== null && _a !== void 0 ? _a : `cmd.exe`;
+}
+exports.getCmdPath = getCmdPath;
 //# sourceMappingURL=io-util.js.map
 
 /***/ }),
@@ -8255,6 +9026,90 @@ try {
 
 /***/ }),
 
+/***/ 742:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.OidcClient = void 0;
+const http_client_1 = __webpack_require__(539);
+const auth_1 = __webpack_require__(226);
+const core_1 = __webpack_require__(470);
+class OidcClient {
+    static createHttpClient(allowRetry = true, maxRetry = 10) {
+        const requestOptions = {
+            allowRetries: allowRetry,
+            maxRetries: maxRetry
+        };
+        return new http_client_1.HttpClient('actions/oidc-client', [new auth_1.BearerCredentialHandler(OidcClient.getRequestToken())], requestOptions);
+    }
+    static getRequestToken() {
+        const token = process.env['ACTIONS_ID_TOKEN_REQUEST_TOKEN'];
+        if (!token) {
+            throw new Error('Unable to get ACTIONS_ID_TOKEN_REQUEST_TOKEN env variable');
+        }
+        return token;
+    }
+    static getIDTokenUrl() {
+        const runtimeUrl = process.env['ACTIONS_ID_TOKEN_REQUEST_URL'];
+        if (!runtimeUrl) {
+            throw new Error('Unable to get ACTIONS_ID_TOKEN_REQUEST_URL env variable');
+        }
+        return runtimeUrl;
+    }
+    static getCall(id_token_url) {
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            const httpclient = OidcClient.createHttpClient();
+            const res = yield httpclient
+                .getJson(id_token_url)
+                .catch(error => {
+                throw new Error(`Failed to get ID Token. \n 
+        Error Code : ${error.statusCode}\n 
+        Error Message: ${error.result.message}`);
+            });
+            const id_token = (_a = res.result) === null || _a === void 0 ? void 0 : _a.value;
+            if (!id_token) {
+                throw new Error('Response json body do not have ID Token field');
+            }
+            return id_token;
+        });
+    }
+    static getIDToken(audience) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                // New ID Token is requested from action service
+                let id_token_url = OidcClient.getIDTokenUrl();
+                if (audience) {
+                    const encodedAudience = encodeURIComponent(audience);
+                    id_token_url = `${id_token_url}&audience=${encodedAudience}`;
+                }
+                core_1.debug(`ID token url is ${id_token_url}`);
+                const id_token = yield OidcClient.getCall(id_token_url);
+                core_1.setSecret(id_token);
+                return id_token;
+            }
+            catch (error) {
+                throw new Error(`Error message: ${error.message}`);
+            }
+        });
+    }
+}
+exports.OidcClient = OidcClient;
+//# sourceMappingURL=oidc-utils.js.map
+
+/***/ }),
+
 /***/ 747:
 /***/ (function(module) {
 
@@ -8288,6 +9143,25 @@ module.exports = require("url");
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -8297,14 +9171,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.DownloadHttpClient = void 0;
 const fs = __importStar(__webpack_require__(747));
 const core = __importStar(__webpack_require__(470));
 const zlib = __importStar(__webpack_require__(761));
@@ -8314,6 +9182,7 @@ const status_reporter_1 = __webpack_require__(176);
 const perf_hooks_1 = __webpack_require__(630);
 const http_manager_1 = __webpack_require__(452);
 const config_variables_1 = __webpack_require__(401);
+const requestUtils_1 = __webpack_require__(489);
 class DownloadHttpClient {
     constructor() {
         this.downloadHttpManager = new http_manager_1.HttpManager(config_variables_1.getDownloadFileConcurrency(), '@actions/artifact-download');
@@ -8329,13 +9198,9 @@ class DownloadHttpClient {
             // use the first client from the httpManager, `keep-alive` is not used so the connection will close immediately
             const client = this.downloadHttpManager.getClient(0);
             const headers = utils_1.getDownloadHeaders('application/json');
-            const response = yield client.get(artifactUrl, headers);
+            const response = yield requestUtils_1.retryHttpClientRequest('List Artifacts', () => __awaiter(this, void 0, void 0, function* () { return client.get(artifactUrl, headers); }));
             const body = yield response.readBody();
-            if (utils_1.isSuccessStatusCode(response.message.statusCode) && body) {
-                return JSON.parse(body);
-            }
-            utils_1.displayHttpDiagnostics(response);
-            throw new Error(`Unable to list artifacts for the run. Resource Url ${artifactUrl}`);
+            return JSON.parse(body);
         });
     }
     /**
@@ -8351,13 +9216,9 @@ class DownloadHttpClient {
             // use the first client from the httpManager, `keep-alive` is not used so the connection will close immediately
             const client = this.downloadHttpManager.getClient(0);
             const headers = utils_1.getDownloadHeaders('application/json');
-            const response = yield client.get(resourceUrl.toString(), headers);
+            const response = yield requestUtils_1.retryHttpClientRequest('Get Container Items', () => __awaiter(this, void 0, void 0, function* () { return client.get(resourceUrl.toString(), headers); }));
             const body = yield response.readBody();
-            if (utils_1.isSuccessStatusCode(response.message.statusCode) && body) {
-                return JSON.parse(body);
-            }
-            utils_1.displayHttpDiagnostics(response);
-            throw new Error(`Unable to get ContainersItems from ${resourceUrl}`);
+            return JSON.parse(body);
         });
     }
     /**
@@ -8407,7 +9268,7 @@ class DownloadHttpClient {
         return __awaiter(this, void 0, void 0, function* () {
             let retryCount = 0;
             const retryLimit = config_variables_1.getRetryLimit();
-            const destinationStream = fs.createWriteStream(downloadPath);
+            let destinationStream = fs.createWriteStream(downloadPath);
             const headers = utils_1.getDownloadHeaders('application/json', true, true);
             // a single GET request is used to download a file
             const makeDownloadRequest = () => __awaiter(this, void 0, void 0, function* () {
@@ -8432,16 +9293,31 @@ class DownloadHttpClient {
                     if (retryAfterValue) {
                         // Back off by waiting the specified time denoted by the retry-after header
                         core.info(`Backoff due to too many requests, retry #${retryCount}. Waiting for ${retryAfterValue} milliseconds before continuing the download`);
-                        yield new Promise(resolve => setTimeout(resolve, retryAfterValue));
+                        yield utils_1.sleep(retryAfterValue);
                     }
                     else {
                         // Back off using an exponential value that depends on the retry count
                         const backoffTime = utils_1.getExponentialRetryTimeInMilliseconds(retryCount);
                         core.info(`Exponential backoff for retry #${retryCount}. Waiting for ${backoffTime} milliseconds before continuing the download`);
-                        yield new Promise(resolve => setTimeout(resolve, backoffTime));
+                        yield utils_1.sleep(backoffTime);
                     }
                     core.info(`Finished backoff for retry #${retryCount}, continuing with download`);
                 }
+            });
+            const isAllBytesReceived = (expected, received) => {
+                // be lenient, if any input is missing, assume success, i.e. not truncated
+                if (!expected ||
+                    !received ||
+                    process.env['ACTIONS_ARTIFACT_SKIP_DOWNLOAD_VALIDATION']) {
+                    core.info('Skipping download validation.');
+                    return true;
+                }
+                return parseInt(expected) === received;
+            };
+            const resetDestinationStream = (fileDownloadPath) => __awaiter(this, void 0, void 0, function* () {
+                destinationStream.close();
+                yield utils_1.rmFile(fileDownloadPath);
+                destinationStream = fs.createWriteStream(fileDownloadPath);
             });
             // keep trying to download a file until a retry limit has been reached
             while (retryCount <= retryLimit) {
@@ -8458,14 +9334,30 @@ class DownloadHttpClient {
                     yield backOff();
                     continue;
                 }
+                let forceRetry = false;
                 if (utils_1.isSuccessStatusCode(response.message.statusCode)) {
                     // The body contains the contents of the file however calling response.readBody() causes all the content to be converted to a string
                     // which can cause some gzip encoded data to be lost
                     // Instead of using response.readBody(), response.message is a readableStream that can be directly used to get the raw body contents
-                    return this.pipeResponseToFile(response, destinationStream, isGzip(response.message.headers));
+                    try {
+                        const isGzipped = isGzip(response.message.headers);
+                        yield this.pipeResponseToFile(response, destinationStream, isGzipped);
+                        if (isGzipped ||
+                            isAllBytesReceived(response.message.headers['content-length'], yield utils_1.getFileSize(downloadPath))) {
+                            return;
+                        }
+                        else {
+                            forceRetry = true;
+                        }
+                    }
+                    catch (error) {
+                        // retry on error, most likely streams were corrupted
+                        forceRetry = true;
+                    }
                 }
-                else if (utils_1.isRetryableStatusCode(response.message.statusCode)) {
+                if (forceRetry || utils_1.isRetryableStatusCode(response.message.statusCode)) {
                     core.info(`A ${response.message.statusCode} response code has been received while attempting to download an artifact`);
+                    resetDestinationStream(downloadPath);
                     // if a throttled status code is received, try to get the retryAfter header value, else differ to standard exponential backoff
                     utils_1.isThrottledStatusCode(response.message.statusCode)
                         ? yield backOff(utils_1.tryGetRetryAfterValueTimeInMilliseconds(response.message.headers))
@@ -8491,24 +9383,40 @@ class DownloadHttpClient {
                 if (isGzip) {
                     const gunzip = zlib.createGunzip();
                     response.message
+                        .on('error', error => {
+                        core.error(`An error occurred while attempting to read the response stream`);
+                        gunzip.close();
+                        destinationStream.close();
+                        reject(error);
+                    })
                         .pipe(gunzip)
+                        .on('error', error => {
+                        core.error(`An error occurred while attempting to decompress the response stream`);
+                        destinationStream.close();
+                        reject(error);
+                    })
                         .pipe(destinationStream)
                         .on('close', () => {
                         resolve();
                     })
                         .on('error', error => {
-                        core.error(`An error has been encountered while decompressing and writing a downloaded file to ${destinationStream.path}`);
+                        core.error(`An error occurred while writing a downloaded file to ${destinationStream.path}`);
                         reject(error);
                     });
                 }
                 else {
                     response.message
+                        .on('error', error => {
+                        core.error(`An error occurred while attempting to read the response stream`);
+                        destinationStream.close();
+                        reject(error);
+                    })
                         .pipe(destinationStream)
                         .on('close', () => {
                         resolve();
                     })
                         .on('error', error => {
-                        core.error(`An error has been encountered while writing a downloaded file to ${destinationStream.path}`);
+                        core.error(`An error occurred while writing a downloaded file to ${destinationStream.path}`);
                         reject(error);
                     });
                 }
@@ -8525,8 +9433,6 @@ exports.DownloadHttpClient = DownloadHttpClient;
 /***/ 856:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
-exports.alphasort = alphasort
-exports.alphasorti = alphasorti
 exports.setopts = setopts
 exports.ownProp = ownProp
 exports.makeAbs = makeAbs
@@ -8539,17 +9445,14 @@ function ownProp (obj, field) {
   return Object.prototype.hasOwnProperty.call(obj, field)
 }
 
+var fs = __webpack_require__(747)
 var path = __webpack_require__(622)
 var minimatch = __webpack_require__(93)
 var isAbsolute = __webpack_require__(681)
 var Minimatch = minimatch.Minimatch
 
-function alphasorti (a, b) {
-  return a.toLowerCase().localeCompare(b.toLowerCase())
-}
-
 function alphasort (a, b) {
-  return a.localeCompare(b)
+  return a.localeCompare(b, 'en')
 }
 
 function setupIgnores (self, options) {
@@ -8608,6 +9511,7 @@ function setopts (self, pattern, options) {
   self.stat = !!options.stat
   self.noprocess = !!options.noprocess
   self.absolute = !!options.absolute
+  self.fs = options.fs || fs
 
   self.maxLength = options.maxLength || Infinity
   self.cache = options.cache || Object.create(null)
@@ -8677,7 +9581,7 @@ function finish (self) {
     all = Object.keys(all)
 
   if (!self.nosort)
-    all = all.sort(self.nocase ? alphasorti : alphasort)
+    all = all.sort(alphasort)
 
   // at *some* point we statted all of these
   if (self.mark) {
@@ -8784,6 +9688,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.sleep = exports.getProperRetention = exports.rmFile = exports.getFileSize = exports.createEmptyFilesForArtifact = exports.createDirectoriesForArtifact = exports.displayHttpDiagnostics = exports.getArtifactUrl = exports.createHttpClient = exports.getUploadHeaders = exports.getDownloadHeaders = exports.getContentRange = exports.tryGetRetryAfterValueTimeInMilliseconds = exports.isThrottledStatusCode = exports.isRetryableStatusCode = exports.isForbiddenStatusCode = exports.isSuccessStatusCode = exports.getApiVersion = exports.parseEnvNumber = exports.getExponentialRetryTimeInMilliseconds = void 0;
 const core_1 = __webpack_require__(470);
 const fs_1 = __webpack_require__(747);
 const http_client_1 = __webpack_require__(539);
@@ -8803,7 +9708,7 @@ function getExponentialRetryTimeInMilliseconds(retryCount) {
     const minTime = config_variables_1.getInitialRetryIntervalInMilliseconds() * config_variables_1.getRetryMultiplier() * retryCount;
     const maxTime = minTime * config_variables_1.getRetryMultiplier();
     // returns a random number between the minTime (inclusive) and the maxTime (exclusive)
-    return Math.random() * (maxTime - minTime) + minTime;
+    return Math.trunc(Math.random() * (maxTime - minTime) + minTime);
 }
 exports.getExponentialRetryTimeInMilliseconds = getExponentialRetryTimeInMilliseconds;
 /**
@@ -8844,8 +9749,9 @@ function isRetryableStatusCode(statusCode) {
     }
     const retryableStatusCodes = [
         http_client_1.HttpCodes.BadGateway,
-        http_client_1.HttpCodes.ServiceUnavailable,
         http_client_1.HttpCodes.GatewayTimeout,
+        http_client_1.HttpCodes.InternalServerError,
+        http_client_1.HttpCodes.ServiceUnavailable,
         http_client_1.HttpCodes.TooManyRequests,
         413 // Payload Too Large
     ];
@@ -8981,48 +9887,6 @@ Header Information: ${JSON.stringify(response.message.headers, undefined, 2)}
 ###### End Diagnostic HTTP information ######`);
 }
 exports.displayHttpDiagnostics = displayHttpDiagnostics;
-/**
- * Invalid characters that cannot be in the artifact name or an uploaded file. Will be rejected
- * from the server if attempted to be sent over. These characters are not allowed due to limitations with certain
- * file systems such as NTFS. To maintain platform-agnostic behavior, all characters that are not supported by an
- * individual filesystem/platform will not be supported on all fileSystems/platforms
- *
- * FilePaths can include characters such as \ and / which are not permitted in the artifact name alone
- */
-const invalidArtifactFilePathCharacters = ['"', ':', '<', '>', '|', '*', '?'];
-const invalidArtifactNameCharacters = [
-    ...invalidArtifactFilePathCharacters,
-    '\\',
-    '/'
-];
-/**
- * Scans the name of the artifact to make sure there are no illegal characters
- */
-function checkArtifactName(name) {
-    if (!name) {
-        throw new Error(`Artifact name: ${name}, is incorrectly provided`);
-    }
-    for (const invalidChar of invalidArtifactNameCharacters) {
-        if (name.includes(invalidChar)) {
-            throw new Error(`Artifact name is not valid: ${name}. Contains character: "${invalidChar}". Invalid artifact name characters include: ${invalidArtifactNameCharacters.toString()}.`);
-        }
-    }
-}
-exports.checkArtifactName = checkArtifactName;
-/**
- * Scans the name of the filePath used to make sure there are no illegal characters
- */
-function checkArtifactFilePath(path) {
-    if (!path) {
-        throw new Error(`Artifact path: ${path}, is incorrectly provided`);
-    }
-    for (const invalidChar of invalidArtifactFilePathCharacters) {
-        if (path.includes(invalidChar)) {
-            throw new Error(`Artifact path is not valid: ${path}. Contains character: "${invalidChar}". Invalid characters include: ${invalidArtifactFilePathCharacters.toString()}.`);
-        }
-    }
-}
-exports.checkArtifactFilePath = checkArtifactFilePath;
 function createDirectoriesForArtifact(directories) {
     return __awaiter(this, void 0, void 0, function* () {
         for (const directory of directories) {
@@ -9041,6 +9905,41 @@ function createEmptyFilesForArtifact(emptyFilesToCreate) {
     });
 }
 exports.createEmptyFilesForArtifact = createEmptyFilesForArtifact;
+function getFileSize(filePath) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const stats = yield fs_1.promises.stat(filePath);
+        core_1.debug(`${filePath} size:(${stats.size}) blksize:(${stats.blksize}) blocks:(${stats.blocks})`);
+        return stats.size;
+    });
+}
+exports.getFileSize = getFileSize;
+function rmFile(filePath) {
+    return __awaiter(this, void 0, void 0, function* () {
+        yield fs_1.promises.unlink(filePath);
+    });
+}
+exports.rmFile = rmFile;
+function getProperRetention(retentionInput, retentionSetting) {
+    if (retentionInput < 0) {
+        throw new Error('Invalid retention, minimum value is 1.');
+    }
+    let retention = retentionInput;
+    if (retentionSetting) {
+        const maxRetention = parseInt(retentionSetting);
+        if (!isNaN(maxRetention) && maxRetention < retention) {
+            core_1.warning(`Retention days is greater than the max value allowed by the repository setting, reduce retention to ${maxRetention} days`);
+            retention = maxRetention;
+        }
+    }
+    return retention;
+}
+exports.getProperRetention = getProperRetention;
+function sleep(milliseconds) {
+    return __awaiter(this, void 0, void 0, function* () {
+        return new Promise(resolve => setTimeout(resolve, milliseconds));
+    });
+}
+exports.sleep = sleep;
 //# sourceMappingURL=utils.js.map
 
 /***/ }),
@@ -9048,7 +9947,10 @@ exports.createEmptyFilesForArtifact = createEmptyFilesForArtifact;
 /***/ 875:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-const {promisify} = __webpack_require__(669);
+"use strict";
+
+
+const { promisify } = __webpack_require__(669);
 const tmp = __webpack_require__(150);
 
 // file
@@ -9190,6 +10092,25 @@ exports.checkBypass = checkBypass;
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -9199,14 +10120,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getExecOutput = exports.exec = void 0;
+const string_decoder_1 = __webpack_require__(304);
 const tr = __importStar(__webpack_require__(9));
 /**
  * Exec a command.
@@ -9232,6 +10148,51 @@ function exec(commandLine, args, options) {
     });
 }
 exports.exec = exec;
+/**
+ * Exec a command and get the output.
+ * Output will be streamed to the live console.
+ * Returns promise with the exit code and collected stdout and stderr
+ *
+ * @param     commandLine           command to execute (can include additional args). Must be correctly escaped.
+ * @param     args                  optional arguments for tool. Escaping is handled by the lib.
+ * @param     options               optional exec options.  See ExecOptions
+ * @returns   Promise<ExecOutput>   exit code, stdout, and stderr
+ */
+function getExecOutput(commandLine, args, options) {
+    var _a, _b;
+    return __awaiter(this, void 0, void 0, function* () {
+        let stdout = '';
+        let stderr = '';
+        //Using string decoder covers the case where a mult-byte character is split
+        const stdoutDecoder = new string_decoder_1.StringDecoder('utf8');
+        const stderrDecoder = new string_decoder_1.StringDecoder('utf8');
+        const originalStdoutListener = (_a = options === null || options === void 0 ? void 0 : options.listeners) === null || _a === void 0 ? void 0 : _a.stdout;
+        const originalStdErrListener = (_b = options === null || options === void 0 ? void 0 : options.listeners) === null || _b === void 0 ? void 0 : _b.stderr;
+        const stdErrListener = (data) => {
+            stderr += stderrDecoder.write(data);
+            if (originalStdErrListener) {
+                originalStdErrListener(data);
+            }
+        };
+        const stdOutListener = (data) => {
+            stdout += stdoutDecoder.write(data);
+            if (originalStdoutListener) {
+                originalStdoutListener(data);
+            }
+        };
+        const listeners = Object.assign(Object.assign({}, options === null || options === void 0 ? void 0 : options.listeners), { stdout: stdOutListener, stderr: stdErrListener });
+        const exitCode = yield exec(commandLine, args, Object.assign(Object.assign({}, options), { listeners }));
+        //flush any remaining characters
+        stdout += stdoutDecoder.end();
+        stderr += stderrDecoder.end();
+        return {
+            exitCode,
+            stdout,
+            stderr
+        };
+    });
+}
+exports.getExecOutput = getExecOutput;
 //# sourceMappingURL=exec.js.map
 
 /***/ })
