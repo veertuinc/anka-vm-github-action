@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: build
         id: build
-        uses: veertuinc/anka-vm-github-action@v1.3.2
+        uses: veertuinc/anka-vm-github-action@v1.3.3
         with:
           anka-vm-template-name: "11.4"
           anka-vm-tag-name: "vanilla+port-forward-22+brew-git"
@@ -86,7 +86,7 @@ These are defined under the `with:` mapping key inside of your workflow yaml.
 #### `anka-custom-vm-label` (string) (optional)
 - **Label for the cloned VM that will execute your code**
 - Defaults to `github-actions-${GITHUB_REPOSITORY}-${GITHUB_RUN_NUMBER}-${GITHUB_JOB}-${GITHUB_ACTION}`
-- Your custom label will have a random number added to the end of it to prevent collisions when two VMs are running on the same node with the same label
+- Your custom label will have a random number added to the end of it to prevent collisions when two VMs are running on the same node with the same label. You can target `${GITHUB_ACTION'}_vmLabel` in your `host-post-commands` to target the specific VM.
 #### `host-pre-commands` (string) (optional)
 - **Commands you wish to run outside on the node (host) BEFORE preparation of and execution inside the VM**
 - You need to escape double quotes `\"`
@@ -188,7 +188,7 @@ There are two types of tests we perform:
 1. Unit tests (testing functions)
 
     ```bash
-    yarn test
+    npm run test
     ```
 
 2. Functional testing using a workflow yaml (not in this repo)
@@ -200,6 +200,8 @@ npm run package
 ```
 
 ### TO-DO
+
+- Dynamically generate tests.yml for template version to update without having to manually do it in multiple places.
 - yaml lists: https://github.com/actions/toolkit/issues/184
 - Figure out how to handle agent lost situations (steps just run indefinitely)
 - Support multiple artifacts and files for those artifacts

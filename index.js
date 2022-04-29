@@ -13,8 +13,7 @@ const lockFileLocation = core.getInput('lock-file-location');
 async function run() {
   try {
     const ankaVmTagName = core.getInput('anka-vm-tag-name');
-    const ankaVMLabel = await helpers.getVMLabel(ankaCustomVMLabel)
-
+    const ankaVMLabel = await helpers.getVMLabel(ankaCustomVMLabel);
     const ankaVmCommands = core.getInput('vm-commands');
     const hostPreCommands = core.getInput('host-pre-commands');
     const hostPostCommands = core.getInput('host-post-commands');
