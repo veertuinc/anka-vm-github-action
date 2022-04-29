@@ -200,6 +200,8 @@ npm run package
 ```
 
 ### TO-DO
+
+- Dynamically generate tests.yml for template version to update without having to manually do it in multiple places.
 - yaml lists: https://github.com/actions/toolkit/issues/184
 - Figure out how to handle agent lost situations (steps just run indefinitely)
 - Support multiple artifacts and files for those artifacts
