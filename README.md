@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: build
         id: build
-        uses: veertuinc/anka-vm-github-action@v1.3.2
+        uses: veertuinc/anka-vm-github-action@v1.3.3
         with:
           anka-vm-template-name: "11.4"
           anka-vm-tag-name: "vanilla+port-forward-22+brew-git"
