@@ -63,7 +63,7 @@ jobs:
         id: pull-test-prep-2
         uses: ./
         with:
-          host-pre-commands: "env; anka delete --yes 12.2.0 || true; anka delete --yes 12.2.0-openjdk-1.8.0_292 || true"
+          host-pre-commands: "env; anka delete --yes 12.3.1 || true; anka delete --yes 12.3.1-openjdk-1.8.0_292 || true"
           anka-vm-template-name: "12.3.1"
           anka-vm-tag-name: "vanilla"
           vm-commands: ""
@@ -151,7 +151,7 @@ jobs:
           SCRIPT_AND_ARGS_ANKA_CP_STD='${{ steps.script-and-args-anka-cp.outputs.std }}'
           printf "\n=======================\nscript-and-args-anka-cp stdout\n========================\n$SCRIPT_AND_ARGS_ANKA_CP_STD"
           [[ ! -z "$(echo \\"$SCRIPT_AND_ARGS_ANKA_CP_STD\\" | head -n 1)" ]] || exit 32
-          [[ ! -z "$(echo \\"$SCRIPT_AND_ARGS_ANKA_CP_STD\\" | grep '| 12.2.0 (vanilla)')" ]] || exit 33
+          [[ ! -z "$(echo \\"$SCRIPT_AND_ARGS_ANKA_CP_STD\\" | grep '| 12.3.1 (vanilla)')" ]] || exit 33
 
           true
 
@@ -266,7 +266,7 @@ jobs:
         run: |
           ANKA_CP_CUSTOM_DESTINATION_STD='${{ steps.anka-cp-custom-destination.outputs.std }}'
           printf "\n=======================\nanka-cp-custom-destination stdout\n========================\n$ANKA_CP_CUSTOM_DESTINATION_STD"
-          [[ ! -z "$(echo \\"$ANKA_CP_CUSTOM_DESTINATION_STD\\" | head -n 1)" ]] || exit 70
+          [[ ! -z "$(echo \\"$ANKA_CP_CUSTOM_DESTINATION_STD\\" | head -n 1)" ]] || exit 80
 
           true
 
@@ -333,6 +333,6 @@ jobs:
           PULL_TEST_STD='${{ steps.pull-test-2.outputs.std }}'
           printf "\n=======================\npull test std\n========================\n${{ steps.pull-test-2.outputs.std }}"
           [[ ! -z "$(echo \\"$PULL_TEST_STD\\" | head -n 1)" ]] || exit 100
-          [[ ! -z "$(echo \\"$PULL_TEST_STD\\" | grep 'Lock file /tmp/registry-pull-lock-12.2.0 found')" ]] || exit 101
+          [[ ! -z "$(echo \\"$PULL_TEST_STD\\" | grep 'Lock file /tmp/registry-pull-lock-12.3.1 found')" ]] || exit 101
           
           true
