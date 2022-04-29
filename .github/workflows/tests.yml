@@ -313,7 +313,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: sleep
-        run: "sleep 20"
+        run: "sleep 10"
       - name: pull test 2
         id: pull-test-2
         uses: ./
