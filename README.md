@@ -86,7 +86,7 @@ These are defined under the `with:` mapping key inside of your workflow yaml.
 #### `anka-custom-vm-label` (string) (optional)
 - **Label for the cloned VM that will execute your code**
 - Defaults to `github-actions-${GITHUB_REPOSITORY}-${GITHUB_RUN_NUMBER}-${GITHUB_JOB}-${GITHUB_ACTION}`
-- Your custom label will have a random number added to the end of it to prevent collisions when two VMs are running on the same node with the same label. You can target `${GITHUB_ACTION'}_vmLabel` in your `host-post-commands` to target the specific VM.
+- Your custom label will have a random number added to the end of it to prevent collisions when two VMs are running on the same node with the same label. You can interpolate the ENV we create with `$(eval echo \$$(echo ${GITHUB_ACTION}_vmLabel))` in your `host-post-commands` to obtain the specific VM name.
 #### `host-pre-commands` (string) (optional)
 - **Commands you wish to run outside on the node (host) BEFORE preparation of and execution inside the VM**
 - You need to escape double quotes `\"`
