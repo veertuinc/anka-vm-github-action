@@ -1,5 +1,7 @@
 # Using the Anka VM GitHub Action
 
+**IMPORTANT: This is not able to run other actions inside of the Anka macOS VMs. We recommend our [anka-actions (up/down)](https://docs.veertu.com/anka/plugins-and-integrations/controller-+-registry/github-actions/) instead which will instead run everything inside of the VM itself.**
+
 1. Install the [Anka Build Virtualization Software](https://github.com/veertuinc/getting-started#initial-setup) onto a macOS host machine. 
     - You'll also need an [Anka Template and Tag](https://ankadocs.veertu.com/docs/getting-started/creating-your-first-vm/#anka-build-license--cloud-understanding-vm-templates-tags-and-disk-usage) (you can use our [getting started repo's create-template script](https://github.com/veertuinc/getting-started#create-vm-templatebash))
 2. Install and ensure you have registered a shared (org level; found under org settings/actions) _or_ project specific self-hosted runner (found under repo settings/actions) with GitHub. These runners need to be running on the host machines you run your Anka Virtualization CLI.
