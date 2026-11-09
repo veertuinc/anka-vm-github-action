@@ -1,11 +1,10 @@
 # [[ ]] testing doesn't like when you interpolate a multi-line ${{ steps. . . }} right in the -z ""; set it to a variable first, then test a single line
 # Must single quote output in run: due to quotes in vm-commands: (basic)
 
+# Tests need Anka CI. They do not run on GitHub-hosted runners.
 name: Tests
 on:
   workflow_dispatch:
-  push:
-    branches: [ edge, release/* ]
 
 jobs:
 

@@ -58,9 +58,7 @@ The Actions UI shows these as `CodeQL Advanced / Analyze (javascript-typescript)
 
 Run `42712141330` on commit `acb55ca` finished with both of those jobs `success`. Use those names. Do not use a workflow named `CodeQL` from `.github/workflows/codeql-analysis.yml`. That file is not the gate.
 
-Do not require any other check.
-
-Workflow `Tests` (`.github/workflows/tests.yml`) is not a gate. It runs on a self-hosted macOS runner and needs Anka. A failed, skipped, or missing `Tests` run does not block the release. Do not dispatch `Tests`. Do not retry it.
+Do not require any other check. `CodeQL Advanced` is the only gate.
 
 Do not use the scheduled workflow path `dynamic/github-code-scanning/codeql`. Those runs are CodeQL default setup. They are not this gate.
 
