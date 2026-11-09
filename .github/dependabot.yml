@@ -1,0 +1,16 @@
+# Version updates open pull requests against edge.
+# Security updates ignore target-branch and use the repository default branch.
+# The default branch is edge. Keep it that way.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    target-branch: edge
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    target-branch: edge
