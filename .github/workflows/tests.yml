@@ -12,7 +12,7 @@ jobs:
   failure-tests:
     runs-on: [self-hosted, macOS]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
       - name: normal command failure
         id: normal-command-failure
         uses: ./
@@ -35,7 +35,7 @@ jobs:
   prep:
     runs-on: [self-hosted, macOS]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
       - name: pull test prep 1
         id: pull-test-prep-1
         uses: ./
@@ -58,7 +58,7 @@ jobs:
     runs-on: [self-hosted, macOS]
     needs: [prep, failure-tests]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
       - name: pull test prep 2
         id: pull-test-prep-2
         uses: ./
@@ -80,7 +80,7 @@ jobs:
 
           true
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
       - name: basic commands
         id: basic
         uses: ./
@@ -118,7 +118,7 @@ jobs:
       
           true
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
       - name: chained commands and redirection into file
         id: chained-redirect
         uses: ./
@@ -134,7 +134,7 @@ jobs:
 
           true
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
       - name: script execution with args (anka cp)
         id: script-and-args-anka-cp
         uses: ./
@@ -155,7 +155,7 @@ jobs:
 
           true
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
       - name: inputs are accepted and working
         id: inputs-testing
         uses: ./
@@ -200,7 +200,7 @@ jobs:
 
           true
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
       - name: anka-cp
         id: anka-cp-1
         uses: ./
@@ -235,7 +235,7 @@ jobs:
 
           true
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
       - name: anka-cp-custom-destination
         id: anka-cp-custom-destination
         uses: ./
@@ -270,7 +270,7 @@ jobs:
 
           true
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
       - name: artifacts-anka-cp
         id: artifacts-anka-cp-1
         uses: ./
@@ -311,7 +311,7 @@ jobs:
     runs-on: [self-hosted, macOS]
     needs: [prep, failure-tests]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
       - name: sleep
         run: "sleep 10"
       - name: pull test 2
