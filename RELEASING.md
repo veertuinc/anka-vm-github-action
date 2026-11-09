@@ -45,7 +45,7 @@ A "not found" result means the tag is free.
 
 ## Test gate
 
-The only required check is the workflow named `CodeQL`, file `.github/workflows/codeql-analysis.yml`.
+The only required check is the workflow named `CodeQL Advanced`, file `.github/workflows/codeql.yml`.
 
 That workflow runs on push to `edge` and on pull requests into `edge`.
 
@@ -54,7 +54,9 @@ On the commit you will tag, both jobs must finish with conclusion `success`:
 - `Analyze (javascript-typescript)`
 - `Analyze (actions)`
 
-The Actions UI shows these as `CodeQL / Analyze (javascript-typescript)` and `CodeQL / Analyze (actions)`. The check-run `name` has no `CodeQL /` prefix.
+The Actions UI shows these as `CodeQL Advanced / Analyze (javascript-typescript)` and `CodeQL Advanced / Analyze (actions)`. The check-run `name` has no `CodeQL Advanced /` prefix.
+
+Run `42712141330` on commit `acb55ca` finished with both of those jobs `success`. Use those names. Do not use a workflow named `CodeQL` from `.github/workflows/codeql-analysis.yml`. That file is not the gate.
 
 Do not require any other check.
 
@@ -100,14 +102,15 @@ If the push is rejected, stop. Do not force-push. Do not open a fork pull reques
 
 ## Wait for CodeQL
 
-Wait until the `CodeQL` workflow run for that SHA completes.
+Wait until the `CodeQL Advanced` workflow run for that SHA completes.
 
 ```bash
-gh run list --repo veertuinc/anka-vm-github-action --commit "$SHA" --workflow codeql-analysis.yml --json databaseId,status,conclusion,headSha
+gh run list --repo veertuinc/anka-vm-github-action --commit "$SHA" --workflow codeql.yml --json databaseId,status,conclusion,name,headSha
 ```
 
-- If the list is empty, stop. Do not tag. CodeQL default setup blocks this workflow file. A person must switch the repository from CodeQL default setup to advanced setup. You cannot change that setting.
+- `name` must be `CodeQL Advanced`. If the list is empty, stop. Do not tag.
 - If `conclusion` is `failure`, `cancelled`, or `timed_out`, stop. Do not tag.
+- If the log contains `CodeQL analyses from advanced configurations cannot be processed when the default setup is enabled`, stop. Do not tag. CodeQL default setup is on again. You cannot turn it off.
 - Read the jobs. Both names below must be `success`:
 
 ```bash
