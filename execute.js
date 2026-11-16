@@ -1,6 +1,8 @@
-const exec = require('@actions/exec'); // EXEC IS NOT A BASH INTERPRETER: https://github.com/actions/toolkit/issues/461
+// @actions/exec is ESM-only. Load it through runtime.js.
+// EXEC IS NOT A BASH INTERPRETER: https://github.com/actions/toolkit/issues/461
 const helpers = require('./helpers')
 const fs = require('fs');
+const {loadActionsRuntime} = require('./runtime');
 
 let STD = ''
 
@@ -22,6 +24,7 @@ async function hostCommands(commands,hostCommandOptions,existingSTD) {
       }
     }
   })
+  const {exec} = await loadActionsRuntime();
   // Ensure the options.cwd exists
   if (options.cwd) {
     try {

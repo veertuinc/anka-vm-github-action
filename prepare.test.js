@@ -1,8 +1,12 @@
 let prepare = require('./prepare');
 let fs = require('fs');
-const core = require('@actions/core');
+const {loadActionsRuntime} = require('./runtime');
 
 describe('prepare functions', () => {
+  let core;
+  beforeAll(async () => {
+    ({core} = await loadActionsRuntime());
+  });
   let options = "{ silent: true }"
 
   describe('uploadArtifacts', () => {
@@ -14,7 +18,7 @@ describe('prepare functions', () => {
           ['test','test2','./test3'],
           "./"
         )
-      ).rejects.toThrowError(/Error: cannot find test2 on host in .\//);
+      ).rejects.toThrow(/Error: cannot find test2 on host in .\//);
       fs.unlinkSync('./test');
     }); // TEST
     test('folder not allowed', async() => {
@@ -24,7 +28,7 @@ describe('prepare functions', () => {
           ['testFolder','test2','./test3'],
           "./"
         )
-      ).rejects.toThrowError(/Error: unable to archive directories/);
+      ).rejects.toThrow(/Error: unable to archive directories/);
     }); // TEST
   }); // DESCRIBE
   describe('deleteLockFile', () => {

@@ -1,6 +1,6 @@
-const core = require('@actions/core');
 const execute = require('./execute');
 const prepare = require('./prepare');
+const {loadActionsRuntime} = require('./runtime');
 
 function obtainLastPathSection(path) {
   var pathArray = path.split("/");
@@ -27,6 +27,7 @@ function sleep(ms) {
 module.exports.sleep = sleep;
 
 async function getVMLabel(ankaCustomVMLabel) {
+  const {core} = await loadActionsRuntime();
   if (process.env[`${process.env['GITHUB_ACTION']}_vmLabel`] !== undefined) { // return the existing VM's label
     return process.env[`${process.env['GITHUB_ACTION']}_vmLabel`]
   }
@@ -75,6 +76,7 @@ async function mergeOptions(hostCommandOptions,options) {
 module.exports.mergeOptions = mergeOptions;
 
 async function cleanup(ankaCustomVMLabel,hostCommandOptions,ankaVmTemplateName,lockFileLocation) {
+  const {core} = await loadActionsRuntime();
   try {
     if (process.env[`${process.env['GITHUB_ACTION']}_cloneCreated`] === 'true') { // Prevent the delete if the VM was never created
       await execute.hostCommands(`anka delete --yes ${await getVMLabel(ankaCustomVMLabel)}`,await mergeOptions(hostCommandOptions,{ silent: false }),execute.STD)

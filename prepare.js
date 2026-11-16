@@ -1,13 +1,13 @@
-const core = require('@actions/core');
-const artifact = require('@actions/artifact');
+const path = require('path');
 const helpers = require('./helpers')
-const artifactClient = artifact.create();
 const execute = require('./execute');
 const fs = require('fs');
+const {loadActionsRuntime} = require('./runtime');
 
 let lockFileDefault = "/tmp"
 
 async function createLockFile(ankaVmTemplateName,lockFileLocation,hostCommandOptions) {
+  const {core} = await loadActionsRuntime();
   if (lockFileLocation.length === 0) {
     lockFileLocation = lockFileDefault
   }
@@ -30,6 +30,7 @@ async function createLockFile(ankaVmTemplateName,lockFileLocation,hostCommandOpt
 module.exports.createLockFile = createLockFile;
 
 async function deleteLockFile(ankaVmTemplateName,lockFileLocation) {
+  const {core} = await loadActionsRuntime();
   if (typeof(lockFileLocation) === "undefined" || lockFileLocation.length === 0) {
     lockFileLocation = lockFileDefault
   }
@@ -72,6 +73,7 @@ async function ankaRegistryPull(ankaVmTemplateName,ankaVmTagName,ankaRegistryPul
 module.exports.ankaRegistryPull = ankaRegistryPull;
 
 async function ankaClone(ankaVmTemplateName,ankaVMLabel,hostCommandOptions,lockFileLocation) {
+  const {core} = await loadActionsRuntime();
   try {
     await execute.hostCommands(`anka clone ${ankaVmTemplateName} ${ankaVMLabel}`,hostCommandOptions,execute.STD)
     core.exportVariable(`${process.env['GITHUB_ACTION']}_cloneCreated`, true);
@@ -141,13 +143,14 @@ async function uploadArtifacts(artifactArchiveFileName,artifactHostPaths,artifac
         }
         artifactHostFiles.push(file)
       }
+      const {artifactClient} = await loadActionsRuntime();
       var artifactResult = await artifactClient.uploadArtifact(
         artifactArchiveFileName,
         artifactHostFiles,
-        artifactsDirectoryOnHost,
-        { continueOnError: false }
+        artifactsDirectoryOnHost
       )
-      await execute.hostCommands(`echo \"Created and uploaded artifact ${artifactResult.artifactName} (${artifactResult.size} bytes)\nArchive contents: ${artifactResult.artifactItems}\"`,hostCommandOptions,execute.STD)
+      var uploadedPaths = artifactHostFiles.map((file) => path.resolve(artifactsDirectoryOnHost, file));
+      await execute.hostCommands(`echo \"Created and uploaded artifact ${artifactArchiveFileName} (${artifactResult.size} bytes)\nArchive contents: ${uploadedPaths}\"`,hostCommandOptions,execute.STD)
     } catch (error) {
       throw new Error(`failed artifact upload!\n${error.stack}`)
     }

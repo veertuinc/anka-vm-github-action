@@ -1,16 +1,9 @@
-const core = require('@actions/core');
-const io = require('@actions/io');
 const helpers = require('./helpers')
 const prepare = require('./prepare');
 const execute = require('./execute');
+const {loadActionsRuntime} = require('./runtime');
 
-// Envs accessible to post/cleanup
-const hostCommandOptions = core.getInput('host-command-options');
-const ankaCustomVMLabel = core.getInput('anka-custom-vm-label');
-const ankaVmTemplateName = core.getInput('anka-vm-template-name');
-const lockFileLocation = core.getInput('lock-file-location');
-
-async function run() {
+async function run(core, io, hostCommandOptions, ankaCustomVMLabel, ankaVmTemplateName, lockFileLocation) {
   try {
     const ankaVmTagName = core.getInput('anka-vm-tag-name');
     const ankaVMLabel = await helpers.getVMLabel(ankaCustomVMLabel);
@@ -110,9 +103,22 @@ async function run() {
 }
 
 // We use GITHUB_ACTION in the ENV to prevent other steps from using readyForCleanup when they didn't really fail.
-if (process.env[`${process.env['GITHUB_ACTION']}_readyForCleanup`] === 'true') {
-  helpers.cleanup(ankaCustomVMLabel,hostCommandOptions,ankaVmTemplateName,lockFileLocation)
-} else {
-  core.exportVariable(`${process.env['GITHUB_ACTION']}_readyForCleanup`, true);
-  run()
+async function bootstrap() {
+  const {core, io} = await loadActionsRuntime();
+  const hostCommandOptions = core.getInput('host-command-options');
+  const ankaCustomVMLabel = core.getInput('anka-custom-vm-label');
+  const ankaVmTemplateName = core.getInput('anka-vm-template-name');
+  const lockFileLocation = core.getInput('lock-file-location');
+  try {
+    if (process.env[`${process.env['GITHUB_ACTION']}_readyForCleanup`] === 'true') {
+      await helpers.cleanup(ankaCustomVMLabel,hostCommandOptions,ankaVmTemplateName,lockFileLocation)
+    } else {
+      core.exportVariable(`${process.env['GITHUB_ACTION']}_readyForCleanup`, true);
+      await run(core, io, hostCommandOptions, ankaCustomVMLabel, ankaVmTemplateName, lockFileLocation)
+    }
+  } catch (error) {
+    core.setFailed(`${error.stack}`);
+  }
 }
+
+bootstrap()

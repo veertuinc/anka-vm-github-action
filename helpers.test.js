@@ -1,7 +1,11 @@
 let helpers = require('./helpers');
-const core = require('@actions/core');
+const {loadActionsRuntime} = require('./runtime');
 
 describe('helper functions', () => {
+  let core;
+  beforeAll(async () => {
+    ({core} = await loadActionsRuntime());
+  });
   describe('getVMLabel', () => {
     afterEach(() => {
       core.exportVariable('GITHUB_REPOSITORY', undefined)
@@ -36,7 +40,7 @@ describe('helper functions', () => {
     test('hostCommandOptions: populated (single quotes ERROR)', async() => {
       await expect(
        helpers.mergeOptions("{ silent: true, cwd: '/tmp'}")
-      ).rejects.toThrowError(/inside of a string/)
+      ).rejects.toThrow(/inside of a string/)
     }); // TEST
     test('hostCommandOptions (string), options (object)', async() => {
         expect(await helpers.mergeOptions("{ cwd: \"/tmp\" }",{silent: true})).toEqual({silent: true, cwd: "/tmp"})

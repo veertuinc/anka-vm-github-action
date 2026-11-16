@@ -1,5 +1,6 @@
 let execute = require('./execute');
 let fs = require('fs');
+let path = require('path');
 
 describe('execute functions', () => {
   
@@ -12,12 +13,12 @@ describe('execute functions', () => {
     test('fail with bad command option', async() => {
       await expect(
         execute.hostCommands("java --versio",options)
-      ).rejects.toThrowError(/failed with exit code 1/)
+      ).rejects.toThrow(/failed with exit code 1/)
     });
     test('fail with single quotes', async() => {
       await expect(
         execute.hostCommands("echo 123","{ cwd: './' }")
-      ).rejects.toThrowError(/inside of a string/)
+      ).rejects.toThrow(/inside of a string/)
     });
     test('basic multi', async() => {
       await execute.hostCommands("echo 456",options)
@@ -45,7 +46,7 @@ describe('execute functions', () => {
       echo "HERE" && \
       echo "THERE HERE WHERE"
       exit 40
-      `,options)).rejects.toThrowError(/STDOUT: \/Users\/nathanpierce\/anka-vm-github-action\nSTDOUT: HERE\nSTDOUT: THERE HERE WHERE/);
+      `,options)).rejects.toThrow(new RegExp(`STDOUT: ${path.resolve('.').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\nSTDOUT: HERE\\nSTDOUT: THERE HERE WHERE`));
     });
     test('chained commands and redirection to file', async() => {
       await execute.hostCommands("hostname && echo \"test1\" && echo \"Test2\" > /tmp/test && cat /tmp/test",options)
@@ -91,7 +92,7 @@ describe('execute functions', () => {
               "ankaVmTemplateName",
               "./"
             )
-          ).rejects.toThrowError(/\"testFile9\" does not exist/);
+          ).rejects.toThrow(/\"testFile9\" does not exist/);
         }); // TEST
       }); // DESCRIBE errors
     }); // DESCRIBE in

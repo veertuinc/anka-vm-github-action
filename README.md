@@ -19,7 +19,7 @@ jobs:
   ios:
     runs-on: [self-hosted, macOS]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
       - name: build
         id: build
         uses: veertuinc/anka-vm-github-action@v1.3.3
@@ -41,7 +41,7 @@ jobs:
 
 Using the above yaml, the Anka GitHub Action will:
 
-1. Clone your project repo to the github action runner's working directory (on the host) (`uses: actions/checkout@v2`)
+1. Clone your project repo to the github action runner's working directory (on the host) (`uses: actions/checkout@v7`)
 2. Pull the Template `11.4` and Tag `vanilla+port-forward-22+brew-git` from the Registry into the host
 3. Prepare an Anka VM using that Template and Tag
 4. Upload the entire host working directory (`./`) and a `/Users/nathanpierce/cache` from the user root on the host into the VM using `anka cp`
@@ -149,7 +149,7 @@ jobs:
     runs-on: [self-hosted, macOS]
     needs: prep
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
       - name: sleep
         run: "sleep 20"
       - name: pull test 2
