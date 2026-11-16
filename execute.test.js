@@ -72,11 +72,13 @@ describe('execute functions', () => {
       });
       test('cwd (js object)', async() => {
         await execute.hostCommands("ls","{cwd: \"./dist\"}")
-        await expect(`${execute.STD.trim()}`).toBe("index.js");
+        await expect(execute.finalHostCommandOptions.cwd).toBe("./dist");
+        await expect(execute.STD).toMatch(/index\.js/);
       });
       test('json (json)', async() => {
         await execute.hostCommands("ls","{\"cwd\": \"./dist\"}")
-        await expect(`${execute.STD.trim()}`).toBe("index.js");
+        await expect(execute.finalHostCommandOptions.cwd).toBe("./dist");
+        await expect(execute.STD).toMatch(/index\.js/);
       });
     });
   });
